@@ -18,10 +18,55 @@ game.resourceMarket = nil
 game.phaseManager = nil
 game.playerPanel = nil
 
-function game:enter()
+function game:enter(playersFromSetup)
     print("Game state entered")
     print("Current state:", State.currentState)
     print("Current phase:", State.currentPhase)
+    
+    -- If players are passed from playerSetup, initialize them
+    if playersFromSetup and #playersFromSetup > 0 then
+        print("Received " .. #playersFromSetup .. " players from setup")
+        State.players = {}
+        for i, playerData in ipairs(playersFromSetup) do
+            local player = Player.new(playerData.name, playerData.color)
+            player.money = 50  -- Starting money
+            player.powerPlants = {}
+            player.cities = {}
+            table.insert(State.players, player)
+        end
+        State.currentPlayerIndex = 1
+        -- Initialize game phase for pass-and-play
+        State.currentPhase = enums.GamePhase.PLAYER_ORDER
+        State.currentState = "game"
+        
+        -- Initialize resource market
+        State.setResourceMarket(ResourceMarket.new(#State.players))
+        print("Initialized resource market for " .. #State.players .. " players")
+        
+        -- Load power plants for the market
+        local powerPlantsFile = love.filesystem.read("data/power_plants.json")
+        if powerPlantsFile then
+            local success, powerPlantsData = pcall(json.decode, powerPlantsFile)
+            if success and powerPlantsData then
+                State.powerPlantMarket = {}
+                for _, plantData in ipairs(powerPlantsData) do
+                    local plant = PowerPlant.new(
+                        plantData.id,
+                        plantData.cost,
+                        plantData.capacity,
+                        plantData.resourceType,
+                        plantData.resourceCost
+                    )
+                    table.insert(State.powerPlantMarket, plant)
+                end
+                print("Loaded " .. #State.powerPlantMarket .. " power plants into market")
+            else
+                print("ERROR: Failed to decode power_plants.json")
+            end
+        else
+            print("ERROR: Could not load power_plants.json")
+        end
+    end
 
     print("--- Verifying player power plants in State AT START of game:enter ---")
     if State.players and type(State.players) == "table" then
