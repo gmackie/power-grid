@@ -9,6 +9,7 @@ local PowerPlant = require("models.power_plant")
 local ResourceMarket = require("models.resource_market")
 local json = require("lib.json")
 local enums = require("models.enums")
+local Simulator = require("test.simulator")
 
 function love.load()
     print("Game starting...")
@@ -25,9 +26,14 @@ function love.load()
     -- Initialize state
     State.init()
     
-    -- Check for --auction flag
+    -- Initialize simulator
+    local simulator = Simulator.new()
+    _G.simulator = simulator -- Make globally accessible for debugging
+    
+    -- Check for command line flags
     local startAuction = false
-    local startResourceBuying = false -- New flag
+    local startResourceBuying = false
+    local runTest = nil
 
     for i = 1, #arg do
         print("Checking argument:", arg[i])
@@ -35,9 +41,21 @@ function love.load()
             print("Found --auction flag")
             startAuction = true
             break
-        elseif arg[i] == "--resource" then -- Check for new flag
+        elseif arg[i] == "--resource" then
             print("Found --resource flag")
             startResourceBuying = true
+            break
+        elseif arg[i] == "--test-full" then
+            print("Found --test-full flag")
+            runTest = "full"
+            break
+        elseif arg[i] == "--test-building" then
+            print("Found --test-building flag")
+            runTest = "building"
+            break
+        elseif arg[i] == "--test-phase" then
+            print("Found --test-phase flag")
+            runTest = "phase"
             break
         end
     end
@@ -178,6 +196,19 @@ function love.load()
         end
         
         changeState("game")
+    elseif runTest then
+        print("Running automated test: " .. runTest)
+        State.setCurrentState("menu")
+        changeState("menu")
+        
+        -- Start the appropriate test
+        if runTest == "full" then
+            simulator:runFullGameTest()
+        elseif runTest == "building" then
+            simulator:runBuildingTest()
+        elseif runTest == "phase" then
+            simulator:runPhaseTest("auction")
+        end
     else
         print("Loading main menu")
         State.setCurrentState("menu")
@@ -186,6 +217,11 @@ function love.load()
 end
 
 function love.update(dt)
+    -- Update simulator first
+    if _G.simulator then
+        _G.simulator:update(dt)
+    end
+    
     if currentState and currentState.update then
         currentState:update(dt)
     end
@@ -194,6 +230,14 @@ end
 function love.draw()
     if currentState and currentState.draw then
         currentState:draw()
+    end
+    
+    -- Draw simulator status if running
+    if _G.simulator and _G.simulator:isRunning() then
+        love.graphics.setColor(1, 1, 0, 0.8)
+        love.graphics.setFont(love.graphics.newFont(16))
+        love.graphics.print("SIMULATOR RUNNING: " .. (_G.simulator.currentTest or "unknown"), 10, 10)
+        love.graphics.setColor(1, 1, 1, 1) -- Reset color
     end
 end
 
