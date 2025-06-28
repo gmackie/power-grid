@@ -57,6 +57,10 @@ function love.load()
             print("Found --test-phase flag")
             runTest = "phase"
             break
+        elseif arg[i] == "--test-menu" then
+            print("Found --test-menu flag")
+            runTest = "menu"
+            break
         end
     end
     
@@ -208,6 +212,8 @@ function love.load()
             simulator:runBuildingTest()
         elseif runTest == "phase" then
             simulator:runPhaseTest("auction")
+        elseif runTest == "menu" then
+            simulator:runMenuTest()
         end
     else
         print("Loading main menu")
@@ -237,6 +243,18 @@ function love.draw()
         love.graphics.setColor(1, 1, 0, 0.8)
         love.graphics.setFont(love.graphics.newFont(16))
         love.graphics.print("SIMULATOR RUNNING: " .. (_G.simulator.currentTest or "unknown"), 10, 10)
+        love.graphics.print("Timer: " .. string.format("%.1f", _G.simulator.timer or 0), 10, 30)
+        love.graphics.print("Events in queue: " .. (#_G.simulator.eventQueue or 0), 10, 50)
+        love.graphics.print("Current state: " .. (currentState and "loaded" or "nil"), 10, 70)
+        
+        -- Show recent clicks
+        for i, click in ipairs(debugClicks) do
+            love.graphics.setColor(1, 0, 0, 0.8)
+            love.graphics.circle("fill", click.x, click.y, 8)
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.print(tostring(i), click.x + 10, click.y - 5)
+        end
+        
         love.graphics.setColor(1, 1, 1, 1) -- Reset color
     end
 end
@@ -248,6 +266,12 @@ function love.keypressed(key, scancode, isrepeat)
 end
 
 function love.mousepressed(x, y, button)
+    -- Track clicks for debugging
+    if _G.simulator and _G.simulator:isRunning() then
+        trackClick(x, y)
+        print("[DEBUG] Click at (" .. x .. ", " .. y .. ") button " .. button)
+    end
+    
     if currentState and currentState.mousepressed then
         currentState:mousepressed(x, y, button)
     end
@@ -265,6 +289,9 @@ function love.textinput(text)
     end
 end
 
+-- Debug overlay for showing click positions
+local debugClicks = {}
+
 -- State transition helper
 function changeState(newStateName, ...)
     if states[newStateName] == nil then
@@ -276,5 +303,19 @@ function changeState(newStateName, ...)
     currentState = states[newStateName]
     if currentState and currentState.enter then
         currentState:enter(...)
+    end
+    
+    -- Debug logging
+    if _G.simulator and _G.simulator.verbose then
+        print("[DEBUG] State changed to: " .. newStateName)
+    end
+end
+
+-- Debug click tracking
+function trackClick(x, y)
+    table.insert(debugClicks, {x = x, y = y, time = love.timer.getTime()})
+    -- Keep only last 5 clicks
+    while #debugClicks > 5 do
+        table.remove(debugClicks, 1)
     end
 end

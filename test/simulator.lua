@@ -154,9 +154,9 @@ function Simulator:runFullGameTest()
     -- Test scenario: Complete game flow with 3 AI players
     self:addEvent(0.5, "log", "Starting full game test with AI players")
     
-    -- Navigate to pass and play
-    self:addEvent(1.0, "mousepressed", 800, 400) -- Click Pass and Play button (approximate)
-    self:addEvent(1.1, "mousereleased", 800, 400)
+    -- Navigate to pass and play (button is at 400-600 x 300-350)
+    self:addEvent(1.0, "mousepressed", 500, 325) -- Click Pass and Play button center
+    self:addEvent(1.1, "mousereleased", 500, 325)
     
     -- Add AI players
     self:addEvent(2.0, "log", "Adding AI players")
@@ -164,20 +164,20 @@ function Simulator:runFullGameTest()
     for i, aiPlayer in ipairs(self.aiPlayers) do
         local delay = 2 + (i * 2) -- Space out player additions
         
-        -- Click name input
-        self:addEvent(delay, "mousepressed", 400, 300)
-        self:addEvent(delay + 0.1, "mousereleased", 400, 300)
+        -- Click name input (centered at ~800,200 for 1600x900 window)
+        self:addEvent(delay, "mousepressed", 800, 200)
+        self:addEvent(delay + 0.1, "mousereleased", 800, 200)
         
         -- Enter AI player name
         self:addEvent(delay + 0.5, "textinput", aiPlayer.name)
         
-        -- Select different color
+        -- Select different color (colors are near input box)
         if i > 1 then
             local colorCoords = {
-                {450, 400}, -- First color
-                {500, 400}, -- Second color
-                {550, 400}, -- Third color
-                {600, 400}, -- Fourth color
+                {750, 280}, -- First color
+                {780, 280}, -- Second color  
+                {810, 280}, -- Third color
+                {840, 280}, -- Fourth color
             }
             if colorCoords[i] then
                 self:addEvent(delay + 1.0, "mousepressed", colorCoords[i][1], colorCoords[i][2])
@@ -185,16 +185,16 @@ function Simulator:runFullGameTest()
             end
         end
         
-        -- Click add button
-        self:addEvent(delay + 1.5, "mousepressed", 600, 350)
-        self:addEvent(delay + 1.6, "mousereleased", 600, 350)
+        -- Click add button (centered below colors)
+        self:addEvent(delay + 1.5, "mousepressed", 800, 350)
+        self:addEvent(delay + 1.6, "mousereleased", 800, 350)
     end
     
-    -- Start game
+    -- Start game (start button is below add button)
     local startDelay = 2 + (#self.aiPlayers * 2) + 1
     self:addEvent(startDelay, "log", "Starting game")
-    self:addEvent(startDelay + 0.5, "mousepressed", 800, 500) -- Click start game button
-    self:addEvent(startDelay + 0.6, "mousereleased", 800, 500)
+    self:addEvent(startDelay + 0.5, "mousepressed", 800, 420) -- Click start game button
+    self:addEvent(startDelay + 0.6, "mousereleased", 800, 420)
     
     -- Test game phases with AI decisions
     local phaseDelay = startDelay + 2
@@ -227,6 +227,27 @@ function Simulator:runFullGameTest()
     
     self:addEvent(phaseDelay + 20, "log", "Full game test completed")
     self:addEvent(phaseDelay + 20.5, "custom", function() self:disable() end)
+end
+
+-- Run a simple menu navigation test
+function Simulator:runMenuTest()
+    self:enable("menu_test")
+    
+    self:addEvent(0.5, "log", "Testing menu navigation")
+    
+    -- Click Pass and Play button
+    self:addEvent(1.0, "log", "Clicking Pass and Play button at (500, 325)")
+    self:addEvent(1.5, "mousepressed", 500, 325)
+    self:addEvent(1.6, "mousereleased", 500, 325)
+    
+    -- Check if we transitioned to playerSetup
+    self:addEvent(3.0, "assert", function()
+        local currentState = _G.currentState
+        return currentState and currentState == _G.states["playerSetup"]
+    end, "Should transition to playerSetup state")
+    
+    self:addEvent(4.0, "log", "Menu test completed")
+    self:addEvent(4.5, "custom", function() self:disable() end)
 end
 
 -- Run a quick phase test
