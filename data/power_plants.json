@@ -1,0 +1,296 @@
+[
+    {
+        "id": 3,
+        "cost": 3,
+        "capacity": 1,
+        "resourceType": "OIL",
+        "resourceCost": 2
+    },
+    {
+        "id": 4,
+        "cost": 4,
+        "capacity": 1,
+        "resourceType": "COAL",
+        "resourceCost": 2
+    },
+    {
+        "id": 5,
+        "cost": 5,
+        "capacity": 1,
+        "resourceType": "HYBRID",
+        "resourceCost": 2
+    },
+    {
+        "id": 6,
+        "cost": 6,
+        "capacity": 1,
+        "resourceType": "GARBAGE",
+        "resourceCost": 1
+    },
+    {
+        "id": 7,
+        "cost": 7,
+        "capacity": 2,
+        "resourceType": "OIL",
+        "resourceCost": 3
+    },
+    {
+        "id": 8,
+        "cost": 8,
+        "capacity": 2,
+        "resourceType": "COAL",
+        "resourceCost": 3
+    },
+    {
+        "id": 9,
+        "cost": 9,
+        "capacity": 1,
+        "resourceType": "URANIUM",
+        "resourceCost": 1
+    },
+    {
+        "id": 10,
+        "cost": 10,
+        "capacity": 2,
+        "resourceType": "HYBRID",
+        "resourceCost": 2
+    },
+    {
+        "id": 11,
+        "cost": 11,
+        "capacity": 2,
+        "resourceType": "GARBAGE",
+        "resourceCost": 1
+    },
+    {
+        "id": 12,
+        "cost": 12,
+        "capacity": 2,
+        "resourceType": "COAL",
+        "resourceCost": 2
+    },
+    {
+        "id": 13,
+        "cost": 13,
+        "capacity": 1,
+        "resourceType": "WIND",
+        "resourceCost": 0
+    },
+    {
+        "id": 14,
+        "cost": 14,
+        "capacity": 2,
+        "resourceType": "OIL",
+        "resourceCost": 2
+    },
+    {
+        "id": 15,
+        "cost": 15,
+        "capacity": 3,
+        "resourceType": "COAL",
+        "resourceCost": 2
+    },
+    {
+        "id": 16,
+        "cost": 16,
+        "capacity": 3,
+        "resourceType": "OIL",
+        "resourceCost": 2
+    },
+    {
+        "id": 17,
+        "cost": 17,
+        "capacity": 2,
+        "resourceType": "URANIUM",
+        "resourceCost": 1
+    },
+    {
+        "id": 18,
+        "cost": 18,
+        "capacity": 2,
+        "resourceType": "GARBAGE",
+        "resourceCost": 0
+    },
+    {
+        "id": 19,
+        "cost": 19,
+        "capacity": 3,
+        "resourceType": "URANIUM",
+        "resourceCost": 1
+    },
+    {
+        "id": 20,
+        "cost": 20,
+        "capacity": 5,
+        "resourceType": "COAL",
+        "resourceCost": 3
+    },
+    {
+        "id": 21,
+        "cost": 21,
+        "capacity": 4,
+        "resourceType": "HYBRID",
+        "resourceCost": 2
+    },
+    {
+        "id": 22,
+        "cost": 22,
+        "capacity": 2,
+        "resourceType": "SOLAR",
+        "resourceCost": 0
+    },
+    {
+        "id": 23,
+        "cost": 23,
+        "capacity": 3,
+        "resourceType": "GARBAGE",
+        "resourceCost": 1
+    },
+    {
+        "id": 24,
+        "cost": 24,
+        "capacity": 4,
+        "resourceType": "URANIUM",
+        "resourceCost": 1
+    },
+    {
+        "id": 25,
+        "cost": 25,
+        "capacity": 5,
+        "resourceType": "OIL",
+        "resourceCost": 2
+    },
+    {
+        "id": 26,
+        "cost": 26,
+        "capacity": 5,
+        "resourceType": "COAL",
+        "resourceCost": 2
+    },
+    {
+        "id": 27,
+        "cost": 27,
+        "capacity": 3,
+        "resourceType": "WIND",
+        "resourceCost": 0
+    },
+    {
+        "id": 28,
+        "cost": 28,
+        "capacity": 4,
+        "resourceType": "GARBAGE",
+        "resourceCost": 1
+    },
+    {
+        "id": 29,
+        "cost": 29,
+        "capacity": 4,
+        "resourceType": "HYBRID",
+        "resourceCost": 1
+    },
+    {
+        "id": 30,
+        "cost": 30,
+        "capacity": 6,
+        "resourceType": "URANIUM",
+        "resourceCost": 1
+    },
+    {
+        "id": 31,
+        "cost": 31,
+        "capacity": 6,
+        "resourceType": "COAL",
+        "resourceCost": 3
+    },
+    {
+        "id": 32,
+        "cost": 32,
+        "capacity": 6,
+        "resourceType": "OIL",
+        "resourceCost": 3
+    },
+    {
+        "id": 33,
+        "cost": 33,
+        "capacity": 4,
+        "resourceType": "SOLAR",
+        "resourceCost": 0
+    },
+    {
+        "id": 34,
+        "cost": 34,
+        "capacity": 5,
+        "resourceType": "WIND",
+        "resourceCost": 0
+    },
+    {
+        "id": 35,
+        "cost": 35,
+        "capacity": 5,
+        "resourceType": "GARBAGE",
+        "resourceCost": 1
+    },
+    {
+        "id": 36,
+        "cost": 36,
+        "capacity": 7,
+        "resourceType": "URANIUM",
+        "resourceCost": 1
+    },
+    {
+        "id": 37,
+        "cost": 37,
+        "capacity": 4,
+        "resourceType": "HYBRID",
+        "resourceCost": 3
+    },
+    {
+        "id": 38,
+        "cost": 38,
+        "capacity": 7,
+        "resourceType": "COAL",
+        "resourceCost": 3
+    },
+    {
+        "id": 39,
+        "cost": 39,
+        "capacity": 6,
+        "resourceType": "OIL",
+        "resourceCost": 1
+    },
+    {
+        "id": 40,
+        "cost": 40,
+        "capacity": 6,
+        "resourceType": "SOLAR",
+        "resourceCost": 0
+    },
+    {
+        "id": 42,
+        "cost": 42,
+        "capacity": 6,
+        "resourceType": "WIND",
+        "resourceCost": 0
+    },
+    {
+        "id": 44,
+        "cost": 44,
+        "capacity": 5,
+        "resourceType": "HYBRID",
+        "resourceCost": 1
+    },
+    {
+        "id": 46,
+        "cost": 46,
+        "capacity": 7,
+        "resourceType": "COAL",
+        "resourceCost": 3
+    },
+    {
+        "id": 50,
+        "cost": 50,
+        "capacity": 6,
+        "resourceType": "HYBRID",
+        "resourceCost": 2
+    }
+] 
