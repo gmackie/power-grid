@@ -1,0 +1,116 @@
+{
+  "name": "Test Map",
+  "cities": [
+    {
+      "id": "seattle",
+      "name": "Seattle",
+      "x": 100,
+      "y": 100,
+      "region": "BLUE",
+      "houses": []
+    },
+    {
+      "id": "portland",
+      "name": "Portland", 
+      "x": 120,
+      "y": 180,
+      "region": "BLUE",
+      "houses": []
+    },
+    {
+      "id": "san_francisco",
+      "name": "San Francisco",
+      "x": 80,
+      "y": 300,
+      "region": "YELLOW",
+      "houses": []
+    },
+    {
+      "id": "los_angeles",
+      "name": "Los Angeles",
+      "x": 150,
+      "y": 380,
+      "region": "YELLOW",
+      "houses": []
+    },
+    {
+      "id": "denver",
+      "name": "Denver",
+      "x": 300,
+      "y": 250,
+      "region": "PURPLE",
+      "houses": []
+    },
+    {
+      "id": "chicago",
+      "name": "Chicago",
+      "x": 450,
+      "y": 200,
+      "region": "BROWN",
+      "houses": []
+    },
+    {
+      "id": "new_york",
+      "name": "New York",
+      "x": 600,
+      "y": 180,
+      "region": "GREEN",
+      "houses": []
+    },
+    {
+      "id": "atlanta",
+      "name": "Atlanta",
+      "x": 550,
+      "y": 300,
+      "region": "RED",
+      "houses": []
+    }
+  ],
+  "connections": [
+    {
+      "from": "seattle",
+      "to": "portland",
+      "cost": 3
+    },
+    {
+      "from": "portland",
+      "to": "san_francisco",
+      "cost": 5
+    },
+    {
+      "from": "san_francisco",
+      "to": "los_angeles",
+      "cost": 3
+    },
+    {
+      "from": "los_angeles",
+      "to": "denver",
+      "cost": 8
+    },
+    {
+      "from": "portland",
+      "to": "denver",
+      "cost": 6
+    },
+    {
+      "from": "denver",
+      "to": "chicago",
+      "cost": 4
+    },
+    {
+      "from": "chicago",
+      "to": "new_york",
+      "cost": 7
+    },
+    {
+      "from": "chicago",
+      "to": "atlanta",
+      "cost": 5
+    },
+    {
+      "from": "new_york",
+      "to": "atlanta",
+      "cost": 6
+    }
+  ]
+}

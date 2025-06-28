@@ -29,7 +29,7 @@ function game:enter(playersFromSetup)
         State.players = {}
         for i, playerData in ipairs(playersFromSetup) do
             local player = Player.new(playerData.name, playerData.color)
-            player.money = 50  -- Starting money
+            player.money = 50  -- Standard Power Grid starting money
             player.powerPlants = {}
             player.cities = {}
             table.insert(State.players, player)
@@ -65,6 +65,45 @@ function game:enter(playersFromSetup)
             end
         else
             print("ERROR: Could not load power_plants.json")
+        end
+        
+        -- Load map data
+        local mapFile = love.filesystem.read("data/test_map.json")
+        if mapFile then
+            local success, mapData = pcall(json.decode, mapFile)
+            if success and mapData then
+                State.cities = {}
+                State.connections = {}
+                
+                -- Load cities
+                for _, cityData in ipairs(mapData.cities) do
+                    local city = {
+                        id = cityData.id,
+                        name = cityData.name,
+                        x = cityData.x,
+                        y = cityData.y,
+                        region = cityData.region,
+                        houses = {} -- Will store player houses
+                    }
+                    table.insert(State.cities, city)
+                end
+                
+                -- Load connections
+                for _, connData in ipairs(mapData.connections) do
+                    local connection = {
+                        from = connData.from,
+                        to = connData.to,
+                        cost = connData.cost
+                    }
+                    table.insert(State.connections, connection)
+                end
+                
+                print("Loaded " .. #State.cities .. " cities and " .. #State.connections .. " connections")
+            else
+                print("ERROR: Failed to decode test_map.json")
+            end
+        else
+            print("ERROR: Could not load test_map.json")
         end
     end
 
