@@ -1,0 +1,37 @@
+/* Additional app-specific styles */
+
+.app {
+  min-height: 100vh;
+  background: theme('colors.game.background');
+  color: white;
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 768px) {
+  .app {
+    /* Prevent zoom on input focus */
+    -webkit-text-size-adjust: 100%;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Larger touch targets on mobile */
+  button, 
+  input, 
+  select, 
+  textarea, 
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* PWA optimizations */
+@media (display-mode: standalone) {
+  .app {
+    /* Remove any margin/padding when in PWA mode */
+    margin: 0;
+    padding: 0;
+  }
+}

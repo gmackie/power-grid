@@ -1,0 +1,59 @@
+# Netlify deployment configuration for Power Grid Digital
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_VERSION = "9"
+
+# Redirect all routes to index.html for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for PWA support
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Content-Type = "application/javascript"
+    Cache-Control = "public, max-age=0"
+
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' ws: wss:; font-src 'self'; manifest-src 'self'"
+
+# Environment-specific configurations
+[context.production]
+  [context.production.environment]
+    VITE_SERVER_HOST = "your-production-server.com"
+    VITE_SERVER_PROTOCOL = "wss"
+
+[context.deploy-preview]
+  [context.deploy-preview.environment]
+    VITE_SERVER_HOST = "staging-server.com"
+    VITE_SERVER_PROTOCOL = "wss"
+
+[context.branch-deploy]
+  [context.branch-deploy.environment]
+    VITE_SERVER_HOST = "dev-server.com"
+    VITE_SERVER_PROTOCOL = "ws"
