@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore, useDeviceStore } from '../../store/gameStore';
-import { ResourceType, ResourcePhaseState, ResourceMarket } from '../../types/game';
+import type { ResourceType, ResourcePhaseState, ResourceMarket } from '../../types/game';
 import { Fuel, Minus, Plus, ShoppingCart, Check } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';

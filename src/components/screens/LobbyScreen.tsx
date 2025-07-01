@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { wsManager, lobbyActions } from '../../services/websocket';
-import { MapInfo, LobbyInfo } from '../../types/game';
+import type { MapInfo, LobbyInfo } from '../../types/game';
 import { Settings, Users, Crown, Check, X, Plus, RefreshCw } from 'lucide-react';
 
 interface LobbyPlayer {

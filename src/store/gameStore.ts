@@ -2,8 +2,9 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { GameState, Player, AppState, LobbyState } from '../types/game';
-import { wsManager, gameActions, ConnectionStatus } from '../services/websocket';
+import type { GameState, Player, AppState, LobbyState } from '../types/game';
+import { wsManager, gameActions, lobbyActions } from '../services/websocket';
+import type { ConnectionStatus } from '../services/websocket';
 
 interface GameStore extends AppState {
   // Connection state
@@ -73,12 +74,18 @@ export const useGameStore = create<GameStore>()(
 
     // Game actions
     createGame: (playerName: string, playerColor: string) => {
-      if (gameActions.createGame(playerName, playerColor)) {
-        set({ 
-          playerName,
-          currentScreen: 'lobby'
-        });
-      }
+      // First connect/register the player
+      lobbyActions.connect(playerName);
+      
+      // Then create the lobby
+      setTimeout(() => {
+        if (lobbyActions.createLobby('Game Lobby', playerName, 6, 'usa', '')) {
+          set({ 
+            playerName,
+            currentScreen: 'lobby'
+          });
+        }
+      }, 100); // Small delay to ensure connect message is processed first
     },
 
     joinGame: (gameId: string, playerName: string, playerColor: string) => {
@@ -204,6 +211,22 @@ wsManager.setOnMessage((message) => {
   const store = useGameStore.getState();
   
   switch (message.type) {
+    // Lobby messages
+    case 'LOBBY_CREATED':
+      console.log('Lobby created:', message.data);
+      store.setCurrentScreen('lobby');
+      break;
+      
+    case 'LOBBY_JOINED':
+      console.log('Lobby joined:', message.data);
+      store.setCurrentScreen('lobby');
+      break;
+      
+    case 'PLAYER_CONNECTED':
+      console.log('Player connected:', message.data);
+      break;
+      
+    // Game messages
     case 'game_created':
       if (message.data?.gameId && message.data?.playerId) {
         store.setPlayerInfo(message.data.playerId, store.playerName || 'Player');
@@ -229,6 +252,9 @@ wsManager.setOnMessage((message) => {
       // Handle game end
       console.log('Game ended:', message.data);
       break;
+      
+    default:
+      console.log('Unhandled message:', message.type, message.data);
   }
 });
 

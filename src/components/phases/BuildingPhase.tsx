@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useGameStore, useDeviceStore } from '../../store/gameStore';
-import { BuildingPhaseState, City } from '../../types/game';
+import type { BuildingPhaseState, City } from '../../types/game';
 import { Building2, MapPin, DollarSign, Check, X } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';

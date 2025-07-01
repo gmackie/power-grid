@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { City, Player } from '../types/game';
+import type { City, Player } from '../types/game';
 import { useDeviceStore } from '../store/gameStore';
 import { MapPin, Home } from 'lucide-react';
 import { cn } from '../utils/cn';

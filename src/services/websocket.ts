@@ -1,6 +1,6 @@
 // WebSocket Manager for Power Grid React Client
 
-import { WebSocketMessage, GameState } from '../types/game';
+import type { WebSocketMessage, GameState } from '../types/game';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -186,11 +186,14 @@ export class WebSocketManager {
   private startHeartbeat(): void {
     this.stopHeartbeat();
     
-    this.heartbeatTimer = setInterval(() => {
-      if (this.isConnected()) {
-        this.send({ type: 'ping' });
-      }
-    }, this.config.heartbeatInterval);
+    // Disable heartbeat for now since server doesn't support ping
+    if (this.config.heartbeatInterval && this.config.heartbeatInterval > 0) {
+      this.heartbeatTimer = setInterval(() => {
+        if (this.isConnected()) {
+          this.send({ type: 'ping' });
+        }
+      }, this.config.heartbeatInterval);
+    }
   }
 
   private stopHeartbeat(): void {
@@ -224,7 +227,7 @@ export const wsManager = new WebSocketManager({
   url: getWebSocketUrl(),
   reconnectAttempts: 5,
   reconnectDelay: 1000,
-  heartbeatInterval: 25000
+  heartbeatInterval: 0
 });
 
 // Game-specific helper functions

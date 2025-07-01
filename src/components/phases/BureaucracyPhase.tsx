@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { BureaucracyState, PowerPlant, ResourceType } from '../../types/game';
+import type { BureaucracyState, PowerPlant, ResourceType } from '../../types/game';
 import { Zap, DollarSign, Fuel, TrendingUp, Check, X } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
