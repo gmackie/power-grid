@@ -5,21 +5,23 @@ import { Building2, MapPin, DollarSign, Check, X } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import GameBoard from '../GameBoard';
+import useGameActions from '../../hooks/useGameActions';
 
 interface BuildingPhaseProps {
   buildingPhaseState: BuildingPhaseState;
   cities: City[];
+  localMode?: boolean;
 }
 
-const BuildingPhase: React.FC<BuildingPhaseProps> = ({ buildingPhaseState, cities }) => {
+const BuildingPhase: React.FC<BuildingPhaseProps> = ({ buildingPhaseState, cities, localMode = false }) => {
   const { 
     getCurrentPlayer, 
     isCurrentPlayerTurn,
-    buildCity,
-    pass,
     playerId,
     gameState
   } = useGameStore();
+  
+  const { buildCity, pass } = useGameActions(localMode);
   
   const { isMobile } = useDeviceStore();
   
@@ -215,6 +217,7 @@ const BuildingPhase: React.FC<BuildingPhaseProps> = ({ buildingPhaseState, citie
                     return (
                       <button
                         key={city.id}
+                        data-testid="city-item"
                         className={`
                           w-full p-3 rounded-lg text-left transition-all
                           ${isSelected 

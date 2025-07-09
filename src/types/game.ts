@@ -36,6 +36,8 @@ export interface Player {
     oil: number;
     garbage: number;
     uranium: number;
+    hybrid: number;
+    eco: number;
   };
 }
 
@@ -73,10 +75,14 @@ export interface ResourceMarket {
   oil: number;
   garbage: number;
   uranium: number;
+  hybrid: number;
+  eco: number;
   coalPrice: number;
   oilPrice: number;
   garbagePrice: number;
   uraniumPrice: number;
+  hybridPrice: number;
+  ecoPrice: number;
 }
 
 export type ResourceType = 'coal' | 'oil' | 'garbage' | 'uranium' | 'hybrid' | 'eco';
@@ -130,6 +136,7 @@ export interface BureaucracyState {
 // WebSocket Message Types
 export interface WebSocketMessage {
   type: string;
+  session_id?: string;
   data?: any;
   error?: string;
 }
@@ -163,7 +170,7 @@ export interface ErrorMessage {
 
 // UI State Types
 export interface AppState {
-  currentScreen: 'menu' | 'lobby' | 'game';
+  currentScreen: 'menu' | 'lobby' | 'game' | 'lobby-browser';
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
   gameState?: GameState;
   playerId?: string;
@@ -171,13 +178,52 @@ export interface AppState {
   errorMessage?: string;
 }
 
+// Lobby Types
+export interface Lobby {
+  id: string;
+  name: string;
+  status: 'waiting' | 'starting' | 'in_progress' | 'finished';
+  players: LobbyPlayer[];
+  max_players: number;
+  map_id: string;
+  has_password: boolean;
+  created_at: string;
+  host_id: string;
+}
+
+// Lobby list item type - what the server actually sends in LOBBIES_LISTED
+export interface LobbyListItem {
+  id: string;
+  name: string;
+  status: 'waiting' | 'starting' | 'in_progress' | 'finished';
+  player_count: number;  // Server sends count, not array
+  max_players: number;
+  map_id: string;
+  has_password: boolean;
+  created_at: string;
+}
+
+export interface LobbyPlayer {
+  id: string;
+  name: string;
+  color: string;
+  ready: boolean;
+  is_host: boolean;
+}
+
 export interface LobbyState {
+  id: string;
+  name: string;
+  status: 'waiting' | 'starting' | 'in_progress' | 'finished';
+  max_players: number;
+  map_id: string;
   gameId: string;
   players: {
     id: string;
     name: string;
     color: string;
     ready: boolean;
+    is_host: boolean;
   }[];
   isHost: boolean;
   gameStarted: boolean;

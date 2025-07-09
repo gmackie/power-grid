@@ -4,20 +4,22 @@ import type { ResourceType, ResourcePhaseState, ResourceMarket } from '../../typ
 import { Fuel, Minus, Plus, ShoppingCart, Check } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import useGameActions from '../../hooks/useGameActions';
 
 interface ResourcePhaseProps {
   resourcePhaseState: ResourcePhaseState;
   resourceMarket: ResourceMarket;
+  localMode?: boolean;
 }
 
-const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resourceMarket }) => {
+const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resourceMarket, localMode = false }) => {
   const { 
     getCurrentPlayer, 
     isCurrentPlayerTurn,
-    buyResources,
-    pass,
     playerId
   } = useGameStore();
+  
+  const { buyResources, pass } = useGameActions(localMode);
   
   const { isMobile } = useDeviceStore();
   
@@ -25,7 +27,9 @@ const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resou
     coal: 0,
     oil: 0,
     garbage: 0,
-    uranium: 0
+    uranium: 0,
+    hybrid: 0,
+    eco: 0
   });
   
   const currentPlayer = getCurrentPlayer();
@@ -56,7 +60,9 @@ const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resou
       coal: resourceMarket.coalPrice,
       oil: resourceMarket.oilPrice,
       garbage: resourceMarket.garbagePrice,
-      uranium: resourceMarket.uraniumPrice
+      uranium: resourceMarket.uraniumPrice,
+      hybrid: resourceMarket.hybridPrice || 0,
+      eco: resourceMarket.ecoPrice || 0
     };
     
     // Simple pricing: fixed price per unit (in real game, prices increase as supply decreases)
@@ -96,13 +102,13 @@ const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resou
     const hasResources = Object.values(resourcesToBuy).some(amount => amount > 0);
     if (hasResources && canAffordPurchase()) {
       buyResources(resourcesToBuy);
-      setResourcesToBuy({ coal: 0, oil: 0, garbage: 0, uranium: 0 });
+      setResourcesToBuy({ coal: 0, oil: 0, garbage: 0, uranium: 0, hybrid: 0, eco: 0 });
     }
   };
   
   const handlePass = () => {
     pass();
-    setResourcesToBuy({ coal: 0, oil: 0, garbage: 0, uranium: 0 });
+    setResourcesToBuy({ coal: 0, oil: 0, garbage: 0, uranium: 0, hybrid: 0, eco: 0 });
   };
   
   const renderResourceRow = (type: ResourceType, icon: string, color: string) => {

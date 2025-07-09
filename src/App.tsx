@@ -1,14 +1,16 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useGameStore, useDeviceStore } from './store/gameStore';
 import MainMenu from './components/MainMenu';
-import LobbyScreen from './components/screens/LobbyScreen';
+import LobbyScreen from './components/LobbyScreen';
+import LobbyBrowser from './components/LobbyBrowser';
+import CreateLobby from './components/CreateLobby';
 import GameScreen from './components/GameScreen';
 import ConnectionStatus from './components/ConnectionStatus';
 import ErrorNotification from './components/ErrorNotification';
 import './App.css';
 
 function App() {
-  const { currentScreen, connectionStatus, connect } = useGameStore();
+  const { currentScreen, connectionStatus, connect, currentLobby } = useGameStore();
   const { updateDeviceInfo } = useDeviceStore();
 
   useEffect(() => {
@@ -41,12 +43,65 @@ function App() {
     };
   }, [connectionStatus, connect, updateDeviceInfo]);
 
+  // Handle URL-based navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const url = new URL(window.location.href);
+      const path = url.pathname;
+      const params = new URLSearchParams(url.search);
+      
+      if (path === '/lobby' && params.get('id')) {
+        // If we have a lobby ID in URL, try to rejoin
+        const lobbyId = params.get('id');
+        if (lobbyId && connectionStatus === 'connected') {
+          // This would typically trigger a rejoin attempt
+          console.log('Attempting to rejoin lobby:', lobbyId);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    handlePopState(); // Handle initial load
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [connectionStatus]);
+
+  // Update URL when screen changes
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    
+    switch (currentScreen) {
+      case 'lobby-browser':
+        url.pathname = '/lobbies';
+        url.search = '';
+        break;
+      case 'lobby':
+        url.pathname = '/lobby';
+        if (currentLobby) {
+          url.searchParams.set('id', currentLobby.id);
+        }
+        break;
+      case 'game':
+        url.pathname = '/game';
+        break;
+      default:
+        url.pathname = '/';
+        url.search = '';
+    }
+    
+    window.history.replaceState({}, '', url.toString());
+  }, [currentScreen, currentLobby]);
+
   const renderCurrentScreen = () => {
     switch (currentScreen) {
       case 'menu':
         return <MainMenu />;
+      case 'lobby-browser':
+        return <LobbyBrowser />;
       case 'lobby':
-        return <LobbyScreen />;
+        return currentLobby ? <LobbyScreen /> : <CreateLobby />;
       case 'game':
         return <GameScreen />;
       default:

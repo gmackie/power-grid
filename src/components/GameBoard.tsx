@@ -180,7 +180,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
   };
   
   return (
-    <div className="relative">
+    <div className="relative" data-testid="game-board">
       <canvas
         ref={canvasRef}
         width={dimensions.width}
@@ -189,6 +189,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
         onClick={handleCanvasClick}
         onMouseMove={handleCanvasMove}
         onMouseLeave={() => onCityHover(null)}
+        data-testid="city"
       />
       
       {/* Legend */}

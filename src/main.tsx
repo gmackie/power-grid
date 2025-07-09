@@ -15,9 +15,7 @@ if (!rootElement) {
   document.body.classList.add('app-loaded');
 
   createRoot(rootElement).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
+    <App />
   );
 
   console.log('React app rendered!');

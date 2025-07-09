@@ -5,21 +5,23 @@ import { Gavel, DollarSign, Zap, X, Check } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import Input from '../ui/Input';
+import useGameActions from '../../hooks/useGameActions';
 
 interface AuctionPhaseProps {
   auctionState: AuctionState;
   powerPlantMarket: PowerPlant[];
+  localMode?: boolean;
 }
 
-const AuctionPhase: React.FC<AuctionPhaseProps> = ({ auctionState, powerPlantMarket }) => {
+const AuctionPhase: React.FC<AuctionPhaseProps> = ({ auctionState, powerPlantMarket, localMode = false }) => {
   const { 
     gameState,
     getCurrentPlayer, 
     isCurrentPlayerTurn,
-    bid,
-    pass,
     playerId
   } = useGameStore();
+  
+  const { bid, pass } = useGameActions(localMode);
   
   const { isMobile } = useDeviceStore();
   
@@ -54,7 +56,7 @@ const AuctionPhase: React.FC<AuctionPhaseProps> = ({ auctionState, powerPlantMar
         bid(amount);
       } else if (selectedPlant) {
         // Start new auction
-        bid(selectedPlant.cost);
+        bid(amount, selectedPlant.id);
       }
     }
   };
@@ -93,6 +95,7 @@ const AuctionPhase: React.FC<AuctionPhaseProps> = ({ auctionState, powerPlantMar
     return (
       <div
         key={plant.id}
+        data-testid="power-plant"
         className={`
           relative p-4 rounded-lg border-2 transition-all cursor-pointer
           ${isCurrentAuction 

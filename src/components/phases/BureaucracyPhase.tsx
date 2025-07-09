@@ -4,25 +4,30 @@ import type { BureaucracyState, PowerPlant, ResourceType } from '../../types/gam
 import { Zap, DollarSign, Fuel, TrendingUp, Check, X } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import useGameActions from '../../hooks/useGameActions';
 
 interface BureaucracyPhaseProps {
   bureaucracyState: BureaucracyState;
+  localMode?: boolean;
 }
 
-const BureaucracyPhase: React.FC<BureaucracyPhaseProps> = ({ bureaucracyState }) => {
+const BureaucracyPhase: React.FC<BureaucracyPhaseProps> = ({ bureaucracyState, localMode = false }) => {
   const { 
     getCurrentPlayer, 
     isCurrentPlayerTurn,
-    powerCities,
     playerId
   } = useGameStore();
+  
+  const { powerCities } = useGameActions(localMode);
   
   const [plantsToPower, setPlantsToPower] = useState<Set<number>>(new Set());
   const [resourcesUsed, setResourcesUsed] = useState<Record<ResourceType, number>>({
     coal: 0,
     oil: 0,
     garbage: 0,
-    uranium: 0
+    uranium: 0,
+    hybrid: 0,
+    eco: 0
   });
   
   const currentPlayer = getCurrentPlayer();

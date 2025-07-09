@@ -18,6 +18,8 @@ export class WebSocketManager {
   private reconnectAttempts = 0;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private sessionId: string | null = null;
+  private readonly SESSION_STORAGE_KEY = 'powergrid_session_id';
   
   // Event handlers
   private onConnectionChange: ((status: ConnectionStatus) => void) | null = null;
@@ -32,6 +34,9 @@ export class WebSocketManager {
       heartbeatInterval: 30000,
       ...config
     };
+    
+    // Restore session ID from storage on initialization
+    this.restoreSessionId();
   }
 
   connect(): Promise<void> {
@@ -102,13 +107,27 @@ export class WebSocketManager {
       this.ws = null;
     }
     
+    // Clear session ID on disconnect
+    this.sessionId = null;
+    this.clearStoredSessionId();
+    
     this.setConnectionStatus('disconnected');
   }
 
   send(message: WebSocketMessage): boolean {
     if (this.ws?.readyState === WebSocket.OPEN) {
       try {
-        this.ws.send(JSON.stringify(message));
+        // Include session ID in outgoing messages if available
+        const messageToSend = { ...message };
+        // Include session ID in all messages when available
+        if (this.sessionId) {
+          messageToSend.session_id = this.sessionId;
+          console.log(`Including session ID ${this.sessionId} in ${message.type} message`);
+        } else {
+          console.log(`No session ID available for ${message.type} message`);
+        }
+        
+        this.ws.send(JSON.stringify(messageToSend));
         return true;
       } catch (error) {
         console.error('Failed to send message:', error);
@@ -154,11 +173,26 @@ export class WebSocketManager {
   }
 
   private handleMessage(message: WebSocketMessage): void {
+    // Capture session ID from server messages
+    if (message.session_id) {
+      this.sessionId = message.session_id;
+      this.storeSessionId(message.session_id);
+    }
+
     // Call generic message handler first
     this.onMessage?.(message);
 
     // Handle specific message types
     switch (message.type) {
+      case 'CONNECTED':
+        // Server sends session ID in CONNECTED message
+        if (message.session_id) {
+          this.sessionId = message.session_id;
+          this.storeSessionId(message.session_id);
+          console.log('Session ID received and stored:', this.sessionId);
+        }
+        break;
+        
       case 'game_state':
         if (message.data) {
           this.onGameState?.(message.data as GameState);
@@ -215,12 +249,49 @@ export class WebSocketManager {
       });
     }, delay);
   }
+
+  // Session persistence methods
+  private storeSessionId(sessionId: string): void {
+    try {
+      sessionStorage.setItem(this.SESSION_STORAGE_KEY, sessionId);
+      console.log('Session ID stored in sessionStorage:', sessionId);
+    } catch (error) {
+      console.warn('Failed to store session ID:', error);
+    }
+  }
+
+  private restoreSessionId(): void {
+    try {
+      const storedSessionId = sessionStorage.getItem(this.SESSION_STORAGE_KEY);
+      if (storedSessionId) {
+        this.sessionId = storedSessionId;
+        console.log('Session ID restored from sessionStorage:', storedSessionId);
+      }
+    } catch (error) {
+      console.warn('Failed to restore session ID:', error);
+    }
+  }
+
+  private clearStoredSessionId(): void {
+    try {
+      sessionStorage.removeItem(this.SESSION_STORAGE_KEY);
+      console.log('Session ID cleared from sessionStorage');
+    } catch (error) {
+      console.warn('Failed to clear session ID:', error);
+    }
+  }
+
+  // Get current session ID
+  getSessionId(): string | null {
+    return this.sessionId;
+  }
 }
 
 // Default WebSocket manager instance
 const getWebSocketUrl = (): string => {
-  // Always use ws:// for localhost development
-  return 'ws://localhost:4080/ws';
+  // Check for environment variable first, fallback to default port
+  const port = import.meta.env.VITE_WS_PORT || '4080';
+  return `ws://localhost:${port}/ws`;
 };
 
 export const wsManager = new WebSocketManager({
@@ -252,10 +323,10 @@ export const gameActions = {
     });
   },
 
-  bid: (amount: number) => {
+  bid: (amount: number, plantId?: number) => {
     return wsManager.send({
       type: 'player_action',
-      data: { action: 'bid', params: { amount } }
+      data: { action: 'bid', params: { amount, plant_id: plantId } }
     });
   },
 

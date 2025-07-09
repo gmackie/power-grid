@@ -13,7 +13,9 @@ const MainMenu: React.FC = () => {
     connect, 
     disconnect,
     setCurrentScreen,
-    setPlayerName: setGlobalPlayerName
+    setPlayerName: setGlobalPlayerName,
+    registerPlayer,
+    isPlayerRegistered
   } = useGameStore();
   
   const { isMobile, isTablet, orientation } = useDeviceStore();
@@ -55,7 +57,10 @@ const MainMenu: React.FC = () => {
   const handleJoinLobby = () => {
     if (playerName.trim()) {
       setGlobalPlayerName(playerName.trim());
-      setCurrentScreen('lobby');
+      if (connectionStatus === 'connected' && !isPlayerRegistered) {
+        registerPlayer(playerName.trim());
+      }
+      setCurrentScreen('lobby-browser');
     }
   };
 
@@ -166,11 +171,19 @@ const MainMenu: React.FC = () => {
                 <Button
                   variant="outline"
                   className="w-full touch-target"
-                  onClick={handleCreateGame}
-                  disabled={!playerName.trim() || connectionStatus !== 'connected'}
+                  onClick={() => {
+                    if (playerName.trim()) {
+                      setGlobalPlayerName(playerName.trim());
+                      if (connectionStatus === 'connected' && !isPlayerRegistered) {
+                        registerPlayer(playerName.trim());
+                      }
+                      setCurrentScreen('lobby');
+                    }
+                  }}
+                  disabled={!playerName.trim()}
                 >
                   <Play className="w-5 h-5 mr-2" />
-                  Create New Game (Direct)
+                  Create New Lobby
                 </Button>
                 
                 <Button

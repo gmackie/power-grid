@@ -1,33 +1,44 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { Users, Play, ArrowLeft, Copy, Check } from 'lucide-react';
+import { Users, Play, ArrowLeft, Copy, Check, Crown, Settings } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
+import { lobbyActions } from '../services/websocket';
 
 const LobbyScreen: React.FC = () => {
   const { 
-    gameState, 
-    startGame, 
+    currentLobby,
+    playerName,
+    connectionStatus,
     setCurrentScreen,
-    playerId 
+    leaveLobby,
+    setReady
   } = useGameStore();
 
   const [gameIdCopied, setGameIdCopied] = React.useState(false);
+  const [isReady, setIsReady] = React.useState(false);
 
-  // Mock lobby data for now - replace with actual lobby state
-  const mockLobby = {
-    gameId: 'GAME123',
-    players: [
-      { id: '1', name: 'Player 1', color: '#ff0000', ready: true },
-      { id: '2', name: 'Player 2', color: '#0000ff', ready: false },
-    ],
-    isHost: playerId === '1',
-    gameStarted: false
-  };
+  // Redirect if no lobby
+  useEffect(() => {
+    if (!currentLobby) {
+      setCurrentScreen('lobby-browser');
+    }
+  }, [currentLobby, setCurrentScreen]);
+
+  if (!currentLobby) {
+    return (
+      <div className="min-h-screen bg-game-background flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  const currentPlayer = currentLobby.players.find(p => p.name === playerName);
+  const isHost = currentPlayer?.is_host || false;
 
   const handleCopyGameId = async () => {
     try {
-      await navigator.clipboard.writeText(mockLobby.gameId);
+      await navigator.clipboard.writeText(currentLobby.id);
       setGameIdCopied(true);
       setTimeout(() => setGameIdCopied(false), 2000);
     } catch (error) {
@@ -36,13 +47,19 @@ const LobbyScreen: React.FC = () => {
   };
 
   const handleStartGame = () => {
-    if (mockLobby.isHost && mockLobby.players.length >= 2) {
-      startGame();
+    if (isHost && currentLobby.players.length >= 2) {
+      lobbyActions.startGame();
     }
   };
 
   const handleLeave = () => {
-    setCurrentScreen('menu');
+    leaveLobby();
+  };
+  
+  const handleToggleReady = () => {
+    const newReadyState = !isReady;
+    setIsReady(newReadyState);
+    setReady(newReadyState);
   };
 
   return (
@@ -60,7 +77,7 @@ const LobbyScreen: React.FC = () => {
           </Button>
           
           <h1 className="text-2xl font-bold text-white">
-            Game Lobby
+            {currentLobby.name}
           </h1>
           
           <div></div> {/* Spacer */}
@@ -90,7 +107,7 @@ const LobbyScreen: React.FC = () => {
           
           <div className="text-center">
             <div className="text-3xl font-mono text-blue-400 bg-game-surface rounded-lg py-4 px-6">
-              {mockLobby.gameId}
+              {currentLobby.id}
             </div>
             <p className="text-slate-400 text-sm mt-2">
               Share this ID with friends to let them join
@@ -103,12 +120,12 @@ const LobbyScreen: React.FC = () => {
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 text-white" />
             <h2 className="text-xl font-semibold text-white">
-              Players ({mockLobby.players.length}/6)
+              Players ({currentLobby.players.length}/{currentLobby.max_players})
             </h2>
           </div>
           
           <div className="space-y-3">
-            {mockLobby.players.map((player, index) => (
+            {currentLobby.players.map((player) => (
               <div
                 key={player.id}
                 className="flex items-center justify-between p-3 bg-game-surface rounded-lg"
@@ -118,10 +135,10 @@ const LobbyScreen: React.FC = () => {
                     className="w-6 h-6 rounded-full border-2 border-white"
                     style={{ backgroundColor: player.color }}
                   />
-                  <span className="text-white font-medium">
+                  <span className="text-white font-medium flex items-center gap-2">
                     {player.name}
-                    {player.id === playerId && ' (You)'}
-                    {index === 0 && ' (Host)'}
+                    {player.name === playerName && ' (You)'}
+                    {player.is_host && <Crown className="w-4 h-4 text-yellow-400" />}
                   </span>
                 </div>
                 
@@ -138,7 +155,7 @@ const LobbyScreen: React.FC = () => {
             ))}
             
             {/* Empty slots */}
-            {Array.from({ length: 6 - mockLobby.players.length }).map((_, index) => (
+            {Array.from({ length: currentLobby.max_players - currentLobby.players.length }).map((_, index) => (
               <div
                 key={`empty-${index}`}
                 className="flex items-center p-3 bg-game-surface rounded-lg opacity-50"
@@ -155,31 +172,34 @@ const LobbyScreen: React.FC = () => {
         </Card>
 
         {/* Game Controls */}
-        {mockLobby.isHost && (
+        {isHost && (
           <Card className="p-6">
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">
-                Host Controls
-              </h3>
+              <div className="flex items-center gap-2">
+                <Crown className="w-5 h-5 text-yellow-400" />
+                <h3 className="text-lg font-semibold text-white">
+                  Host Controls
+                </h3>
+              </div>
               
               <div className="flex gap-3">
                 <Button
                   className="flex-1 touch-target"
                   onClick={handleStartGame}
-                  disabled={mockLobby.players.length < 2 || !mockLobby.players.every(p => p.ready)}
+                  disabled={currentLobby.players.length < 2 || !currentLobby.players.every(p => p.ready)}
                 >
                   <Play className="w-5 h-5 mr-2" />
                   Start Game
                 </Button>
               </div>
               
-              {mockLobby.players.length < 2 && (
+              {currentLobby.players.length < 2 && (
                 <p className="text-sm text-yellow-400">
                   Need at least 2 players to start
                 </p>
               )}
               
-              {!mockLobby.players.every(p => p.ready) && mockLobby.players.length >= 2 && (
+              {!currentLobby.players.every(p => p.ready) && currentLobby.players.length >= 2 && (
                 <p className="text-sm text-yellow-400">
                   All players must be ready to start
                 </p>
@@ -189,23 +209,35 @@ const LobbyScreen: React.FC = () => {
         )}
 
         {/* Ready Status */}
-        {!mockLobby.isHost && (
+        {!isHost && (
           <Card className="p-6">
             <div className="text-center space-y-4">
               <p className="text-slate-400">
-                Waiting for the host to start the game...
+                {currentLobby.players.every(p => p.ready) ? 
+                  'Waiting for the host to start the game...' :
+                  'Mark yourself as ready when you\'re prepared to play'
+                }
               </p>
               
               <Button
-                variant="secondary"
+                variant={isReady ? "secondary" : "outline"}
                 className="touch-target"
-                disabled
+                onClick={handleToggleReady}
+                disabled={connectionStatus !== 'connected'}
               >
-                Ready ✓
+                {isReady ? 'Ready ✓' : 'Not Ready'}
               </Button>
             </div>
           </Card>
         )}
+        
+        {/* Lobby Info */}
+        <Card className="p-4 bg-slate-900/50">
+          <div className="flex items-center justify-between text-sm text-slate-400">
+            <span>Map: <span className="text-white capitalize">{currentLobby.map_id}</span></span>
+            <span>Status: <span className="text-white capitalize">{currentLobby.status}</span></span>
+          </div>
+        </Card>
       </div>
     </div>
   );

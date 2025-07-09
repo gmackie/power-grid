@@ -13,16 +13,19 @@ const GameScreen: React.FC = () => {
     gameState, 
     getCurrentPlayer,
     isCurrentPlayerTurn,
-    setCurrentScreen 
+    setCurrentScreen,
+    connectionStatus 
   } = useGameStore();
+  
+  const [localMode, setLocalMode] = React.useState(false);
   
   const { isMobile, orientation } = useDeviceStore();
   
   const currentPlayer = getCurrentPlayer();
   const isMyTurn = isCurrentPlayerTurn();
 
-  // Mock game state for now
-  const mockGameState = {
+  // Use real game state or fallback to mock for development
+  const currentGameState = gameState || {
     currentRound: 1,
     phase: 'auction' as const,
     currentPlayer: 0,
@@ -36,7 +39,7 @@ const GameScreen: React.FC = () => {
         powerPlants: [
           { id: 1, number: 3, cost: 10, resourceType: 'oil' as const, resourceCount: 2, citiesPowered: 1 }
         ],
-        resources: { coal: 0, oil: 2, garbage: 0, uranium: 0 }
+        resources: { coal: 0, oil: 2, garbage: 0, uranium: 0, hybrid: 0, eco: 0 }
       },
       {
         id: '2',
@@ -45,7 +48,7 @@ const GameScreen: React.FC = () => {
         money: 45,
         cities: ['Munich'],
         powerPlants: [],
-        resources: { coal: 0, oil: 0, garbage: 0, uranium: 0 }
+        resources: { coal: 0, oil: 0, garbage: 0, uranium: 0, hybrid: 0, eco: 0 }
       }
     ],
     powerPlantMarket: [
@@ -60,9 +63,6 @@ const GameScreen: React.FC = () => {
   };
 
   const renderPhaseContent = () => {
-    // Use real game state if available, otherwise use mock
-    const currentGameState = gameState || mockGameState;
-    
     switch (currentGameState.phase) {
       case 'auction':
         return (
@@ -76,6 +76,7 @@ const GameScreen: React.FC = () => {
               plantsWon: {}
             }}
             powerPlantMarket={currentGameState.powerPlantMarket}
+            localMode={localMode}
           />
         );
         
@@ -92,11 +93,16 @@ const GameScreen: React.FC = () => {
               oil: 18,
               garbage: 6,
               uranium: 2,
+              hybrid: 0,
+              eco: 0,
               coalPrice: 1,
               oilPrice: 2,
               garbagePrice: 3,
-              uraniumPrice: 8
+              uraniumPrice: 8,
+              hybridPrice: 0,
+              ecoPrice: 0
             }}
+            localMode={localMode}
           />
         );
         
@@ -109,6 +115,7 @@ const GameScreen: React.FC = () => {
               citiesBuilt: {}
             }}
             cities={currentGameState.cities || mockCities}
+            localMode={localMode}
           />
         );
         
@@ -121,6 +128,7 @@ const GameScreen: React.FC = () => {
               citiesPowered: {},
               earnings: {}
             }}
+            localMode={localMode}
           />
         );
         
@@ -221,14 +229,33 @@ const GameScreen: React.FC = () => {
               Power Grid
             </h1>
             <p className="text-sm text-slate-400">
-              Round {mockGameState.currentRound} • {mockGameState.phase} Phase
+              Round {currentGameState.currentRound} • {currentGameState.phase} Phase
             </p>
+            {/* Development mode toggle */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mt-2">
+                <label className="flex items-center gap-2 text-xs text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={localMode}
+                    onChange={(e) => setLocalMode(e.target.checked)}
+                    className="rounded"
+                  />
+                  Local Mode (No Server Sync)
+                </label>
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-green-400' : 
+              connectionStatus === 'connecting' ? 'bg-yellow-400' : 
+              'bg-red-400'
+            }`} />
             <Users className="w-5 h-5 text-slate-400" />
             <span className="text-sm text-slate-400">
-              {mockGameState.players.length}
+              {currentGameState.players.length}
             </span>
           </div>
         </div>
@@ -291,12 +318,12 @@ const GameScreen: React.FC = () => {
             grid gap-4
             ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}
           `}>
-            {mockGameState.players.map((player, index) => (
+            {currentGameState.players.map((player, index) => (
               <div
                 key={player.id}
                 className={`
                   bg-game-surface rounded-lg p-4 border
-                  ${index === mockGameState.currentPlayer 
+                  ${index === currentGameState.currentPlayer 
                     ? 'border-yellow-500 bg-yellow-900/20' 
                     : 'border-slate-600'
                   }
