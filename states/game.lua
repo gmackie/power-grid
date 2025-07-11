@@ -4,11 +4,13 @@ local game = {}
 local Player = require("models.player")
 local PowerPlant = require("models.power_plant")
 local ResourceMarket = require("models.resource_market")
-local PhaseManager = require("phases.phase_manager")
+local PhaseManager = require("phases.phase_manager_networked")
 local UI = require("ui")
 local State = require("state")
 local json = require("lib.json")
 local enums = require("models.enums")
+local NetworkManager = require("network.network_manager")
+local ConnectionStatus = require("ui.connection_status")
 
 -- Game state
 game.players = {}
@@ -17,11 +19,25 @@ game.market = {}
 game.resourceMarket = nil
 game.phaseManager = nil
 game.playerPanel = nil
+game.isOnline = false
+game.network = nil
+game.connectionStatus = nil
 
 function game:enter(playersFromSetup)
     print("Game state entered")
     print("Current state:", State.currentState)
     print("Current phase:", State.currentPhase)
+    
+    -- Check if this is an online game
+    if State.networkGame and State.networkGame.isOnline then
+        self.isOnline = true
+        self.network = NetworkManager.getInstance()
+        self:setupNetworkCallbacks()
+        print("Online game mode activated")
+    else
+        self.isOnline = false
+        print("Offline/pass-and-play mode")
+    end
     
     -- If players are passed from playerSetup, initialize them
     if playersFromSetup and #playersFromSetup > 0 then
@@ -32,6 +48,10 @@ function game:enter(playersFromSetup)
             player.money = 50  -- Standard Power Grid starting money
             player.powerPlants = {}
             player.cities = {}
+            -- Set player ID for online games
+            if playerData.id then
+                player.id = playerData.id
+            end
             table.insert(State.players, player)
         end
         State.currentPlayerIndex = 1
@@ -48,215 +68,268 @@ function game:enter(playersFromSetup)
         if powerPlantsFile then
             local success, powerPlantsData = pcall(json.decode, powerPlantsFile)
             if success and powerPlantsData then
-                State.powerPlantMarket = {}
+                print("Loaded " .. #powerPlantsData .. " power plants")
+                State.powerPlantDeck = {}
                 for _, plantData in ipairs(powerPlantsData) do
                     local plant = PowerPlant.new(
                         plantData.id,
                         plantData.cost,
-                        plantData.capacity,
                         plantData.resourceType,
-                        plantData.resourceCost
+                        plantData.resourcesRequired,
+                        plantData.citiesPowered
                     )
-                    table.insert(State.powerPlantMarket, plant)
+                    table.insert(State.powerPlantDeck, plant)
                 end
-                print("Loaded " .. #State.powerPlantMarket .. " power plants into market")
+                -- Sort deck by cost
+                table.sort(State.powerPlantDeck, function(a, b) return a.cost < b.cost end)
+                
+                -- Initialize the power plant market (first 8 plants)
+                State.powerPlantMarket = {}
+                for i = 1, math.min(8, #State.powerPlantDeck) do
+                    table.insert(State.powerPlantMarket, State.powerPlantDeck[i])
+                end
             else
-                print("ERROR: Failed to decode power_plants.json")
+                print("Error parsing power plants:", powerPlantsData)
             end
         else
-            print("ERROR: Could not load power_plants.json")
+            print("Could not read power plants file")
         end
         
-        -- Load map data
+        -- Load test map
         local mapFile = love.filesystem.read("data/test_map.json")
         if mapFile then
             local success, mapData = pcall(json.decode, mapFile)
             if success and mapData then
-                State.cities = {}
-                State.connections = {}
-                
-                -- Load cities
-                for _, cityData in ipairs(mapData.cities) do
-                    local city = {
-                        id = cityData.id,
-                        name = cityData.name,
-                        x = cityData.x,
-                        y = cityData.y,
-                        region = cityData.region,
-                        houses = {} -- Will store player houses
-                    }
-                    table.insert(State.cities, city)
-                end
-                
-                -- Load connections
-                for _, connData in ipairs(mapData.connections) do
-                    local connection = {
-                        from = connData.from,
-                        to = connData.to,
-                        cost = connData.cost
-                    }
-                    table.insert(State.connections, connection)
-                end
-                
-                print("Loaded " .. #State.cities .. " cities and " .. #State.connections .. " connections")
+                State.map = mapData
+                print("Loaded map with " .. #mapData.cities .. " cities")
             else
-                print("ERROR: Failed to decode test_map.json")
+                print("Error parsing map:", mapData)
             end
         else
-            print("ERROR: Could not load test_map.json")
+            print("Could not read map file")
         end
     end
-
-    print("--- Verifying player power plants in State AT START of game:enter ---")
-    if State.players and type(State.players) == "table" then
-        print("game:enter sees " .. #State.players .. " players in State.players.")
-        for P_idx, P_player in ipairs(State.players) do
-            if P_player and P_player.powerPlants and type(P_player.powerPlants) == "table" then
-                print("GAME-ENTER Player " .. P_player.name .. " has " .. #P_player.powerPlants .. " power plant(s):")
-                for pp_idx, pp_plant in ipairs(P_player.powerPlants) do
-                    print("  GAME-ENTER Plant ID: " .. pp_plant.id)
-                end
-            elseif P_player then
-                print("GAME-ENTER Player " .. P_player.name .. " has no powerPlants table or it's not a table.")
-            else
-                print("GAME-ENTER Player at index " .. P_idx .. " is nil.")
-            end
-        end
-    else
-        print("GAME-ENTER State.players is nil or not a table.")
-    end
-    print("-------------------------------------------------------------------")
     
-    -- Initialize phase manager and UI
+    -- Initialize phase manager
     self.phaseManager = PhaseManager.new()
-    self.playerPanel = UI.PlayerPanel.new()
     
-    -- Set the current player for the player panel
-    if State.getCurrentPlayer() then
-        self.playerPanel:setPlayer(State.getCurrentPlayer())
+    -- Initialize UI
+    self.playerPanel = UI.PlayerPanel.new(10, 10, 200, 150)
+    
+    -- Initialize connection status indicator if online
+    if self.isOnline then
+        self.connectionStatus = ConnectionStatus.new()
     end
     
-    -- If no phase is set, default to AUCTION
-    if not State.currentPhase then
-        print("No phase set, defaulting to AUCTION")
-        State.setCurrentPhase(enums.GamePhase.AUCTION)
-    end
+    -- Game state
+    State.currentState = "game"
+    State.gameStarted = true
+end
 
-    -- Load power plants if not already loaded (REMOVED - main.lua handles this for flag-based starts)
-    --[[ 
-    if #State.powerPlantMarket == 0 then
-        print("Loading power plants from JSON for game:enter - THIS SHOULD LIKELY BE HANDLED DIFFERENTLY OR EARLIER")
-        local paths = {
-            "data/power_plants.json",
-            "love_client2/data/power_plants.json"
-        }
-        
-        local powerPlantsFile = nil
-        local usedPath = nil
-        
-        for _, path in ipairs(paths) do
-            powerPlantsFile = love.filesystem.read(path)
-            if powerPlantsFile then
-                usedPath = path
+function game:setupNetworkCallbacks()
+    -- Handle game state updates from server
+    self.network.onGameStateUpdate = function(gameState)
+        self:updateFromNetworkState(gameState)
+    end
+    
+    -- Handle phase changes
+    self.network.onPhaseChange = function(phase, round)
+        State.currentPhase = self:convertPhaseFromNetwork(phase)
+        State.currentRound = round
+        print("Phase changed to: " .. phase)
+    end
+    
+    -- Handle turn changes
+    self.network.onTurnChange = function(currentPlayerId, turn)
+        -- Find the player index for this ID
+        for i, player in ipairs(State.players) do
+            if player.id == currentPlayerId then
+                State.currentPlayerIndex = i
                 break
             end
         end
-        
-        if powerPlantsFile then
-            print("Successfully loaded power plants from:", usedPath, "(in game:enter)")
-            local success, powerPlants = pcall(json.decode, powerPlantsFile)
-            if success then
-                print("Successfully decoded JSON (in game:enter)")
-                State.powerPlantMarket = {} -- Clear it first to avoid duplicates if called unexpectedly
-                for _, plantData in ipairs(powerPlants) do
-                    local plant = PowerPlant.new(
-                        plantData.id,
-                        plantData.cost,
-                        plantData.capacity,
-                        plantData.resourceType,
-                        plantData.resourceCost
-                    )
-                    table.insert(State.powerPlantMarket, plant)
+    end
+    
+    -- Handle errors
+    self.network.onError = function(code, message)
+        print("Network error: " .. code .. " - " .. message)
+        -- TODO: Show error dialog to player
+    end
+    
+    -- Handle connection lost
+    self.network.onConnectionLost = function()
+        print("Connection lost! Attempting to reconnect...")
+        -- TODO: Show notification to player
+    end
+    
+    -- Handle reconnection
+    self.network.onReconnected = function()
+        print("Successfully reconnected!")
+        -- TODO: Show notification to player
+    end
+end
+
+function game:updateFromNetworkState(networkState)
+    -- Update players
+    if networkState.players then
+        for playerId, playerData in pairs(networkState.players) do
+            -- Find local player object
+            local localPlayer = nil
+            for _, player in ipairs(State.players) do
+                if player.id == playerId then
+                    localPlayer = player
+                    break
                 end
-                print("Loaded " .. #State.powerPlantMarket .. " power plants (in game:enter)")
-            else
-                print("ERROR: Failed to decode JSON (in game:enter):", powerPlants)
             end
-        else
-            print("WARNING: Could not load power plants JSON file from any path (in game:enter)")
+            
+            if localPlayer then
+                -- Update player data
+                localPlayer.money = playerData.money
+                localPlayer.cities = playerData.cities or {}
+                localPlayer.powerPlants = {}
+                
+                -- Convert power plants
+                if playerData.power_plants then
+                    for _, plantData in ipairs(playerData.power_plants) do
+                        local plant = PowerPlant.new(
+                            plantData.id,
+                            plantData.cost,
+                            plantData.resource_type,
+                            plantData.resource_cost,
+                            plantData.capacity
+                        )
+                        table.insert(localPlayer.powerPlants, plant)
+                    end
+                end
+                
+                -- Update resources
+                if playerData.resources then
+                    localPlayer.resources = playerData.resources
+                end
+            end
         end
     end
-    ]]
+    
+    -- Update market
+    if networkState.market and networkState.market.resources then
+        -- TODO: Update resource market from network state
+    end
+    
+    -- Update power plant market
+    if networkState.power_plants then
+        State.powerPlantMarket = {}
+        for _, plantData in ipairs(networkState.power_plants) do
+            local plant = PowerPlant.new(
+                plantData.id,
+                plantData.cost,
+                plantData.resource_type,
+                plantData.resource_cost,
+                plantData.capacity
+            )
+            table.insert(State.powerPlantMarket, plant)
+        end
+    end
+    
+    -- Update turn order
+    if networkState.turn_order then
+        State.turnOrder = networkState.turn_order
+    end
+end
+
+function game:convertPhaseFromNetwork(networkPhase)
+    local phaseMap = {
+        ["PLAYER_ORDER"] = enums.GamePhase.PLAYER_ORDER,
+        ["AUCTION"] = enums.GamePhase.AUCTION,
+        ["BUY_RESOURCES"] = enums.GamePhase.BUY_RESOURCES,
+        ["BUILD_CITIES"] = enums.GamePhase.BUILD_CITIES,
+        ["BUREAUCRACY"] = enums.GamePhase.BUREAUCRACY,
+        ["GAME_END"] = enums.GamePhase.GAME_END
+    }
+    return phaseMap[networkPhase] or enums.GamePhase.PLAYER_ORDER
 end
 
 function game:update(dt)
-    -- Update phase manager if it exists
-    if self.phaseManager and self.phaseManager.update then
+    -- Update network if online
+    if self.isOnline and self.network then
+        self.network:update(dt)
+    end
+    
+    -- Update connection status
+    if self.connectionStatus then
+        self.connectionStatus:update(dt)
+    end
+    
+    -- Update phase manager
+    if self.phaseManager then
         self.phaseManager:update(dt)
     end
     
-    -- Update player panel if it exists
-    if self.playerPanel and self.playerPanel.update then
-        self.playerPanel:update(dt)
+    -- Update player panel
+    if self.playerPanel and State.players and State.currentPlayerIndex then
+        local currentPlayer = State.players[State.currentPlayerIndex]
+        if currentPlayer then
+            self.playerPanel:setPlayer(currentPlayer)
+        end
     end
 end
 
 function game:draw()
-    local windowWidth, windowHeight = love.graphics.getWidth(), love.graphics.getHeight()
+    -- Clear background
+    love.graphics.clear(0.15, 0.15, 0.18, 1)
     
-    -- Draw background
-    love.graphics.setColor(0.12, 0.12, 0.15)
-    love.graphics.rectangle("fill", 0, 0, windowWidth, windowHeight)
-    
-    -- Draw title and phase
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setFont(love.graphics.newFont(32))
-    love.graphics.printf("Power Grid", 0, 40, windowWidth, "center")
-    love.graphics.setFont(love.graphics.newFont(24))
-    
-    -- Draw phase with nil check
-    local phaseText = State.currentPhase or "No Phase"
-    love.graphics.printf("Phase: " .. phaseText, 0, 80, windowWidth, "center")
-    
-    -- Draw current phase
-    if self.phaseManager and self.phaseManager.draw then
+    -- Draw phase manager
+    if self.phaseManager then
         self.phaseManager:draw()
     end
     
     -- Draw player panel
-    if self.playerPanel and self.playerPanel.draw then
+    if self.playerPanel then
         self.playerPanel:draw()
+    end
+    
+    -- Draw connection status
+    if self.connectionStatus then
+        self.connectionStatus:draw()
     end
 end
 
 function game:mousepressed(x, y, button)
-    if self.phaseManager and self.phaseManager.mousepressed then
+    -- Check connection status clicks first
+    if self.connectionStatus then
+        self.connectionStatus:mousepressed(x, y, button)
+    end
+    
+    if self.phaseManager then
         self.phaseManager:mousepressed(x, y, button)
     end
 end
 
 function game:mousereleased(x, y, button)
-    if self.phaseManager and self.phaseManager.mousereleased then
+    if self.phaseManager then
         self.phaseManager:mousereleased(x, y, button)
     end
 end
 
-function game:mousemoved(x, y)
-    if self.phaseManager and self.phaseManager.mousemoved then
-        self.phaseManager:mousemoved(x, y)
-    end
-end
-
 function game:keypressed(key)
-    if self.phaseManager and self.phaseManager.keypressed then
+    if key == "escape" then
+        if self.isOnline then
+            -- TODO: Show confirmation dialog before leaving online game
+            self.network:disconnect()
+        end
+        changeState("menu")
+    elseif self.phaseManager then
         self.phaseManager:keypressed(key)
     end
 end
 
-function game:textinput(t)
-    if self.phaseManager and self.phaseManager.textinput then
-        self.phaseManager:textinput(t)
+function game:leave()
+    -- Clean up network callbacks if online
+    if self.isOnline and self.network then
+        self.network.onGameStateUpdate = nil
+        self.network.onPhaseChange = nil
+        self.network.onTurnChange = nil
+        self.network.onError = nil
     end
 end
 
-return game 
+return game

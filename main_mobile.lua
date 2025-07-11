@@ -17,23 +17,8 @@ local TouchAdapter = require("mobile.touch_adapter")
 
 local touchAdapter = nil
 
--- Integration test support
-local integrationTestMode = false
-local IntegrationTestHarness = nil
-
-function love.load(args)
+function love.load()
     print("Power Grid Digital - Mobile Edition starting...")
-    
-    -- Check for integration test mode
-    if args then
-        for _, arg in ipairs(args) do
-            if arg == "--test-integration" then
-                integrationTestMode = true
-                print("Integration test mode enabled")
-                break
-            end
-        end
-    end
     
     -- Initialize mobile configuration
     MobileConfig.initialize()
@@ -88,53 +73,14 @@ function love.load(args)
         _G.simulator = simulator
     end
     
-    -- Initialize integration test harness if in test mode
-    if integrationTestMode then
-        local success, testHarness = pcall(require, "test.integration_test_harness")
-        if success then
-            IntegrationTestHarness = testHarness:new()
-            IntegrationTestHarness:installGlobalHooks()
-            IntegrationTestHarness:addBasicNetworkTests()
-            _G.testHarness = IntegrationTestHarness
-            print("Integration test harness initialized")
-        else
-            print("Warning: Could not load integration test harness")
-        end
-    end
-    
     -- Set initial state
     changeState("menu")
-    
-    -- Start integration tests after UI loads
-    if integrationTestMode and IntegrationTestHarness then
-        -- Start tests after a delay to let the UI initialize
-        IntegrationTestHarness.startDelay = 2.0
-    end
 end
 
 function love.update(dt)
     -- Update touch adapter
     if touchAdapter then
         touchAdapter:update(dt)
-    end
-    
-    -- Update integration test harness
-    if IntegrationTestHarness then
-        if IntegrationTestHarness.startDelay then
-            IntegrationTestHarness.startDelay = IntegrationTestHarness.startDelay - dt
-            if IntegrationTestHarness.startDelay <= 0 then
-                IntegrationTestHarness.startDelay = nil
-                IntegrationTestHarness:start()
-            end
-        else
-            IntegrationTestHarness:update(dt)
-            
-            -- Auto-exit when tests complete
-            if not IntegrationTestHarness.isRunning and IntegrationTestHarness.results and #IntegrationTestHarness.results > 0 then
-                print("All integration tests completed, exiting...")
-                love.event.quit()
-            end
-        end
     end
     
     -- Update current state
@@ -298,9 +244,6 @@ function changeState(newStateName, ...)
     end
     
     currentState = states[newStateName]
-    
-    -- Track current state globally for test harness
-    _G.currentStateName = newStateName
     
     if currentState.enter then
         currentState:enter(...)
