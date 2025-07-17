@@ -4,7 +4,12 @@
       "Bash(ls:*)",
       "Bash(chmod:*)",
       "Bash(lua:*)",
-      "Bash(love:*)"
+      "Bash(love:*)",
+      "Bash(mkdir:*)",
+      "Bash(python3:*)",
+      "Bash(./generate_svg_assets.sh:*)",
+      "Bash(find:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
