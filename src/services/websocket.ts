@@ -290,7 +290,7 @@ export class WebSocketManager {
 // Default WebSocket manager instance
 const getWebSocketUrl = (): string => {
   // Check for environment variable first, fallback to default port
-  const port = import.meta.env.VITE_WS_PORT || '4080';
+  const port = import.meta.env.VITE_WS_PORT || '5080';
   return `ws://localhost:${port}/ws`;
 };
 

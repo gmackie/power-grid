@@ -2,7 +2,20 @@
   "permissions": {
     "allow": [
       "Bash(npm run build:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run generate:*)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)",
+      "Bash(go build:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run:*)",
+      "Bash(touch:*)",
+      "Bash(go get:*)",
+      "Bash(npm test:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }

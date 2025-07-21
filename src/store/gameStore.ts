@@ -196,7 +196,7 @@ interface GameStore extends AppState {
   simulatePowerCities: (citiesPowered: number) => void;
   
   // UI state management
-  setCurrentScreen: (screen: 'menu' | 'lobby' | 'game' | 'lobby-browser') => void;
+  setCurrentScreen: (screen: 'menu' | 'lobby' | 'game' | 'lobby-browser' | 'admin') => void;
   setConnectionStatus: (status: ConnectionStatus) => void;
   setGameState: (state: GameState) => void;
   setPlayerInfo: (id: string, name: string) => void;

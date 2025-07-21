@@ -5,12 +5,12 @@ const TestWebSocket: React.FC = () => {
   const [messages, setMessages] = useState<string[]>([]);
 
   useEffect(() => {
-    console.log('TestWebSocket: Attempting to connect to ws://localhost:4080/ws');
-    const ws = new WebSocket('ws://localhost:4080/ws');
+    console.log('TestWebSocket: Attempting to connect to ws://localhost:5080/ws');
+    const ws = new WebSocket('ws://localhost:5080/ws');
 
     ws.onopen = () => {
       console.log('TestWebSocket: Connected!');
-      setStatus('Connected to ws://localhost:4080/ws');
+      setStatus('Connected to ws://localhost:5080/ws');
       ws.send(JSON.stringify({
         type: 'CONNECT',
         data: { player_name: 'TestPlayer' }

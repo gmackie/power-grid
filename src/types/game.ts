@@ -170,7 +170,7 @@ export interface ErrorMessage {
 
 // UI State Types
 export interface AppState {
-  currentScreen: 'menu' | 'lobby' | 'game' | 'lobby-browser';
+  currentScreen: 'menu' | 'lobby' | 'game' | 'lobby-browser' | 'admin';
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
   gameState?: GameState;
   playerId?: string;

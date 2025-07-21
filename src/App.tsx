@@ -7,6 +7,7 @@ import CreateLobby from './components/CreateLobby';
 import GameScreen from './components/GameScreen';
 import ConnectionStatus from './components/ConnectionStatus';
 import ErrorNotification from './components/ErrorNotification';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import './App.css';
 
 function App() {
@@ -86,6 +87,9 @@ function App() {
       case 'game':
         url.pathname = '/game';
         break;
+      case 'admin':
+        url.pathname = '/admin';
+        break;
       default:
         url.pathname = '/';
         url.search = '';
@@ -104,6 +108,8 @@ function App() {
         return currentLobby ? <LobbyScreen /> : <CreateLobby />;
       case 'game':
         return <GameScreen />;
+      case 'admin':
+        return <AdminDashboard />;
       default:
         return <MainMenu />;
     }

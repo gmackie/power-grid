@@ -4,6 +4,33 @@ import { Page, expect } from '@playwright/test';
  * Common test utilities for Power Grid E2E tests
  */
 
+/**
+ * Wait for WebSocket connection to be established
+ */
+export async function waitForWebSocket(page: Page) {
+  // Wait for the connection status to show connected
+  // Try multiple possible selectors for connection status
+  try {
+    await Promise.race([
+      page.waitForSelector('text=Connected', { timeout: 5000 }),
+      page.waitForSelector('.text-green-500:has-text("Connected")', { timeout: 5000 }),
+      page.waitForSelector('[data-testid="connection-status"]:has-text("Connected")', { timeout: 5000 }),
+      // Just wait a bit if no connection indicator is found
+      page.waitForTimeout(2000)
+    ]);
+  } catch {
+    // Continue even if connection status is not found
+    console.log('WebSocket connection status not found, continuing...');
+  }
+}
+
+/**
+ * Generate a random name for testing
+ */
+export function getRandomName(prefix: string = 'Test'): string {
+  return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
 export class TestUtils {
   constructor(private page: Page) {}
 

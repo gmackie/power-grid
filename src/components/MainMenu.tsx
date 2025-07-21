@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore, useDeviceStore } from '../store/gameStore';
-import { Play, Users, Settings, Wifi, WifiOff, Smartphone, Monitor } from 'lucide-react';
+import { Play, Users, Settings, Wifi, WifiOff, Smartphone, Monitor, Shield } from 'lucide-react';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Card from './ui/Card';
@@ -34,11 +34,6 @@ const MainMenu: React.FC = () => {
     { value: '#8000ff', name: 'Purple' }
   ];
 
-  const handleCreateGame = () => {
-    if (playerName.trim()) {
-      createGame(playerName.trim(), selectedColor);
-    }
-  };
 
   const handleJoinGame = () => {
     if (playerName.trim() && gameId.trim()) {
@@ -231,10 +226,17 @@ const MainMenu: React.FC = () => {
         </Card>
 
         {/* Settings */}
-        <Card className="p-4">
+        <Card className="p-4 space-y-2">
           <button className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-white transition-colors touch-target">
             <Settings className="w-5 h-5" />
             <span>Settings</span>
+          </button>
+          <button 
+            className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-white transition-colors touch-target"
+            onClick={() => setCurrentScreen('admin')}
+          >
+            <Shield className="w-5 h-5" />
+            <span>Admin Dashboard</span>
           </button>
         </Card>
 

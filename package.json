@@ -13,6 +13,7 @@
     "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
+    "@power-grid/api-client": "file:../power-grid-api",
     "@types/node": "^24.0.7",
     "autoprefixer": "^10.4.21",
     "lucide-react": "^0.525.0",
