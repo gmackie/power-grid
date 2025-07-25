@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ci.gmac.io
-  IMAGE_NAME: power-grid-web
+  IMAGE_NAME: mackieg/power-grid-web
 
 jobs:
   build-and-deploy:
@@ -26,8 +26,8 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
+          username: ${{ gitea.actor }}
+          password: ${{ secrets.GITEA_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -43,7 +43,7 @@ jobs:
       - name: Build and push React client Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./react_client
+          context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -65,7 +65,7 @@ jobs:
             INGRESS_HOST="staging-pr-${{ github.event.pull_request.number }}.gmac.io"
           else
             NAMESPACE="default"
-            APP_NAME="power-grid"
+            APP_NAME="power-grid-web"
             INGRESS_HOST="power-grid.gmac.io"
           fi
           
