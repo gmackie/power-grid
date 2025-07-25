@@ -1,0 +1,217 @@
+name: Deploy Frontend to Production
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  REGISTRY: ci.gmac.io
+  IMAGE_NAME: mackieg/power-grid-web
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./react_client
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_WS_URL=wss://ws.power-grid.gmac.io
+
+      - name: Deploy to K3s
+        env:
+          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          # Setup kubeconfig
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_CONTENT" | base64 -d > ~/.kube/config
+          
+          # Determine deployment environment
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            NAMESPACE="staging"
+            APP_NAME="power-grid-pr-${{ github.event.pull_request.number }}"
+            INGRESS_HOST="staging-pr-${{ github.event.pull_request.number }}.gmac.io"
+          else
+            NAMESPACE="default"
+            APP_NAME="power-grid-web"
+            INGRESS_HOST="power-grid.gmac.io"
+          fi
+          
+          echo "Deploying to $NAMESPACE namespace as $APP_NAME"
+          
+          # Create namespace if it doesn't exist
+          kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Generate deployment manifest
+          cat > deployment.yaml <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: $APP_NAME
+            namespace: $NAMESPACE
+            labels:
+              app: $APP_NAME
+              version: "${{ github.sha }}"
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: $APP_NAME
+            template:
+              metadata:
+                labels:
+                  app: $APP_NAME
+                  version: "${{ github.sha }}"
+              spec:
+                containers:
+                - name: web
+                  image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+                  ports:
+                  - containerPort: 80
+                    name: http
+                  resources:
+                    requests:
+                      memory: "64Mi"
+                      cpu: "50m"
+                    limits:
+                      memory: "128Mi"
+                      cpu: "100m"
+                  env:
+                  - name: REACT_APP_WS_URL
+                    value: "wss://ws.power-grid.gmac.io"
+                  livenessProbe:
+                    httpGet:
+                      path: /
+                      port: 80
+                    initialDelaySeconds: 10
+                    periodSeconds: 30
+                  readinessProbe:
+                    httpGet:
+                      path: /
+                      port: 80
+                    initialDelaySeconds: 5
+                    periodSeconds: 10
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: $APP_NAME
+            namespace: $NAMESPACE
+            labels:
+              app: $APP_NAME
+          spec:
+            selector:
+              app: $APP_NAME
+            ports:
+            - port: 80
+              targetPort: 80
+              name: http
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: $APP_NAME
+            namespace: $NAMESPACE
+            labels:
+              app: $APP_NAME
+            annotations:
+              cert-manager.io/cluster-issuer: "letsencrypt-prod"
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+              nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+              nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+          spec:
+            tls:
+            - hosts:
+              - $INGRESS_HOST
+              secretName: $APP_NAME-tls
+            rules:
+            - host: $INGRESS_HOST
+              http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: $APP_NAME
+                      port:
+                        number: 80
+          EOF
+          
+          # Apply the deployment
+          kubectl apply -f deployment.yaml
+          
+          # Wait for deployment to be ready
+          kubectl rollout status deployment/$APP_NAME -n $NAMESPACE --timeout=5m
+          
+          # Get deployment info
+          echo "Deployment complete!"
+          echo "Application URL: https://$INGRESS_HOST"
+          echo ""
+          echo "Deployment status:"
+          kubectl get deployment,service,ingress -n $NAMESPACE -l app=$APP_NAME
+          
+      - name: Comment PR with deployment URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const deploymentUrl = `https://staging-pr-${prNumber}.gmac.io`;
+            
+            const comment = `🚀 **Deployment Preview Ready!**
+            
+            Your changes have been deployed to: ${deploymentUrl}
+            
+            **Deployment Details:**
+            - Image: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}\`
+            - Namespace: \`staging\`
+            - WebSocket URL: \`wss://ws.power-grid.gmac.io\`
+            
+            This preview will be automatically updated when you push new commits.`;
+            
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

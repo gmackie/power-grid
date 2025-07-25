@@ -1,69 +1,137 @@
-# React + TypeScript + Vite
+# Power Grid Web Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+[![Deploy Frontend](https://github.com/YOUR_USERNAME/power-grid-web/actions/workflows/deploy-frontend.yml/badge.svg)](https://github.com/YOUR_USERNAME/power-grid-web/actions/workflows/deploy-frontend.yml)
 
-Currently, two official plugins are available:
+React-based web frontend for the Power Grid digital board game.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+**Live Demo**: [https://power-grid.gmac.io](https://power-grid.gmac.io)
 
-## Expanding the ESLint configuration
+## Overview
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+This is the web frontend for Power Grid, a digital adaptation of the classic board game. It connects to a Go WebSocket server to provide real-time multiplayer gameplay.
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Features
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+- 🎮 Real-time multiplayer gameplay
+- 🎨 Modern React UI with TypeScript
+- 🔌 WebSocket communication for live updates
+- 📱 Responsive design
+- 🚀 Automatic deployments with GitHub Actions
+- 🔒 SSL/TLS encryption
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Tech Stack
+
+- **Frontend**: React 18, TypeScript, Vite
+- **State Management**: Zustand
+- **Styling**: Tailwind CSS
+- **WebSocket**: Native WebSocket API
+- **Deployment**: Docker, Kubernetes (K3s)
+- **CI/CD**: GitHub Actions
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Run linting
+npm run lint
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Environment Variables
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Create a `.env.local` file for local development:
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_WS_URL=ws://localhost:5080/ws
+VITE_WS_PORT=5080
 ```
+
+In production, the app automatically connects to `wss://ws.power-grid.gmac.io`.
+
+## Deployment
+
+### Automatic Deployment
+
+The application is automatically deployed when:
+- **Production**: Push to `main` or `master` branch → https://power-grid.gmac.io
+- **Staging**: Open a pull request → https://staging-pr-{number}.gmac.io
+
+### Manual Deployment
+
+1. Build the Docker image:
+   ```bash
+   docker build -t power-grid-web .
+   ```
+
+2. Run locally:
+   ```bash
+   docker run -p 8080:80 power-grid-web
+   ```
+
+### Required Secrets
+
+Configure these GitHub secrets for deployment:
+- `REGISTRY_USERNAME`: Gitea registry username
+- `REGISTRY_PASSWORD`: Gitea registry password
+- `KUBECONFIG`: Base64-encoded K3s kubeconfig
+
+## Architecture
+
+```
+┌─────────────────────┐     ┌──────────────────────┐
+│   React Frontend    │────▶│   WebSocket Server   │
+│ power-grid.gmac.io  │     │ ws.power-grid.gmac.io│
+└─────────────────────┘     └──────────────────────┘
+         │                            │
+         └────────────┬───────────────┘
+                      │
+                 ┌────▼────┐
+                 │   K3s   │
+                 │ Cluster │
+                 └─────────┘
+```
+
+## Project Structure
+
+```
+src/
+├── components/      # React components
+│   ├── admin/      # Admin dashboard
+│   ├── phases/     # Game phase components
+│   ├── screens/    # Main screens
+│   └── ui/         # Reusable UI components
+├── hooks/          # Custom React hooks
+├── services/       # API and WebSocket services
+├── store/          # Zustand state management
+├── types/          # TypeScript type definitions
+└── utils/          # Utility functions
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

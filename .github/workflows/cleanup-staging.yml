@@ -1,0 +1,63 @@
+name: Cleanup Staging Deployments
+
+on:
+  pull_request:
+    types: [closed]
+
+env:
+  REGISTRY: ci.gmac.io
+  IMAGE_NAME: power-grid-web
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Clean up K3s resources
+        env:
+          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          # Setup kubeconfig
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_CONTENT" | base64 -d > ~/.kube/config
+          
+          # Define the app name for this PR
+          APP_NAME="power-grid-pr-${{ github.event.pull_request.number }}"
+          NAMESPACE="staging"
+          
+          echo "Cleaning up resources for $APP_NAME in $NAMESPACE namespace"
+          
+          # Delete all resources associated with this PR
+          kubectl delete deployment,service,ingress -n $NAMESPACE -l app=$APP_NAME --ignore-not-found=true
+          
+          # Clean up the TLS secret
+          kubectl delete secret $APP_NAME-tls -n $NAMESPACE --ignore-not-found=true
+          
+          echo "Cleanup complete for PR #${{ github.event.pull_request.number }}"
+          
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            
+            const comment = `🧹 **Staging Deployment Cleaned Up**
+            
+            The staging deployment for PR #${prNumber} has been removed.
+            
+            Thank you for your contribution!`;
+            
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
