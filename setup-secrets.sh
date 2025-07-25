@@ -21,10 +21,10 @@ KUBECONFIG_BASE64=$(cat kubeconfig-base64.txt)
 echo "Adding secrets to Gitea repository: ${REPO_NAME}"
 echo "================================================"
 
-# Add GITEA_TOKEN secret
-echo -n "Adding GITEA_TOKEN secret... "
+# Add GITEATOKEN secret
+echo -n "Adding GITEATOKEN secret... "
 HTTP_CODE=$(curl -X PUT \
-  "${GITEA_URL}/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/actions/secrets/GITEA_TOKEN" \
+  "${GITEA_URL}/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/actions/secrets/GITEATOKEN" \
   -H "Authorization: token ${GITEA_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{\"data\": \"${GITEA_TOKEN}\"}" \

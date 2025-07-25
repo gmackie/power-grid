@@ -24,3 +24,13 @@ playwright-report/*
 *.njsproj
 *.sln
 *.sw?
+
+# Sensitive files - NEVER commit these!
+kubeconfig-base64.txt
+kubeconfig
+*.pem
+*.key
+*.crt
+*.p12
+secrets.txt
+credentials.json
