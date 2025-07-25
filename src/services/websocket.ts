@@ -289,7 +289,17 @@ export class WebSocketManager {
 
 // Default WebSocket manager instance
 const getWebSocketUrl = (): string => {
-  // Check for environment variable first, fallback to default port
+  // Use environment variable for WebSocket URL
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+  
+  // In production, use wss://ws.power-grid.gmac.io
+  if (import.meta.env.PROD) {
+    return 'wss://ws.power-grid.gmac.io';
+  }
+  
+  // In development, use local WebSocket server
   const port = import.meta.env.VITE_WS_PORT || '5080';
   return `ws://localhost:${port}/ws`;
 };
