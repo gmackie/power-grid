@@ -4,7 +4,7 @@ import Button from '../ui/Button';
 import { SimulatedGamesList } from './SimulatedGamesList';
 import { CreateSimulatedGame } from './CreateSimulatedGame';
 import { GameMonitor } from './GameMonitor';
-import { SimulatedGame } from '../../types/admin';
+import type { SimulatedGame } from '../../types/admin';
 
 export const SimulatedGames: React.FC = () => {
   const [activeView, setActiveView] = useState<'list' | 'create' | 'monitor'>('list');

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { SimulatedGame } from '../../types/admin';
+import type { SimulatedGame } from '../../types/admin';
 import { RefreshCw, Play, Pause, Eye, Trash2 } from 'lucide-react';
 
 interface SimulatedGamesListProps {

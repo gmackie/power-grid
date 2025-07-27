@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { adminApi } from '../../services/adminApi';
-import { LeaderboardEntry } from '@power-grid/api-client';
+import type { LeaderboardEntry } from '../../types/api-client';
 
 export const LeaderboardView: React.FC = () => {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -71,28 +71,28 @@ export const LeaderboardView: React.FC = () => {
         <div className="p-4">
           <div className="flex flex-wrap gap-2 mb-4">
             <Button
-              variant={leaderboardType === 'global' ? 'primary' : 'outline'}
+              variant={leaderboardType === 'global' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setLeaderboardType('global')}
             >
               Global
             </Button>
             <Button
-              variant={leaderboardType === 'weekly' ? 'primary' : 'outline'}
+              variant={leaderboardType === 'weekly' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setLeaderboardType('weekly')}
             >
               Weekly
             </Button>
             <Button
-              variant={leaderboardType === 'monthly' ? 'primary' : 'outline'}
+              variant={leaderboardType === 'monthly' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setLeaderboardType('monthly')}
             >
               Monthly
             </Button>
             <Button
-              variant={leaderboardType === 'alltime' ? 'primary' : 'outline'}
+              variant={leaderboardType === 'alltime' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setLeaderboardType('alltime')}
             >
@@ -152,7 +152,7 @@ export const LeaderboardView: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {entries.map((entry) => (
-                    <tr key={entry.player_id} className="hover:bg-gray-50">
+                    <tr key={entry.playerId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {entry.rank}
                         {entry.rank <= 3 && (
@@ -164,16 +164,16 @@ export const LeaderboardView: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {entry.player_name}
+                        {entry.playerName}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {entry.rating}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {entry.games_played}
+                        {entry.gamesPlayed}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {(entry.win_rate * 100).toFixed(1)}%
+                        {(entry.winRate * 100).toFixed(1)}%
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span className={getTrendColor(entry.trend)}>

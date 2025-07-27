@@ -1,4 +1,4 @@
-import { CreateSimulatedGameRequest, SimulatedGame, AIPlayer } from '../types/admin';
+import type { CreateSimulatedGameRequest, SimulatedGame, AIPlayer } from '../types/admin';
 
 export interface LaunchAIClientRequest {
   lobbyId: string;

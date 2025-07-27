@@ -5,7 +5,10 @@ import {
   AchievementsApi,
   LeaderboardsApi,
   AnalyticsApi,
-  createApiConfiguration,
+  createApiConfiguration
+} from '../types/api-client';
+
+import type {
   ServerInfo,
   MapSummary,
   PlayerSummary,
@@ -20,7 +23,7 @@ import {
   AchievementAnalytics,
   AchievementLeaderboardEntry,
   HealthStatus
-} from '@power-grid/api-client';
+} from '../types/api-client';
 
 export class AdminApiService {
   private serverApi: ServerApi;
