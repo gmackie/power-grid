@@ -98,6 +98,7 @@ jobs:
                 containers:
                 - name: web
                   image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+                  imagePullPolicy: Always
                   ports:
                   - containerPort: 80
                   resources:
@@ -154,6 +155,17 @@ jobs:
           kubectl apply -f deployment.yaml
           
           # Wait for deployment to be ready
-          kubectl rollout status deployment/$APP_NAME -n $NAMESPACE
+          echo "Waiting for deployment to be ready..."
+          kubectl rollout status deployment/$APP_NAME -n $NAMESPACE --timeout=5m || {
+            echo "Deployment failed to become ready. Checking pod status..."
+            kubectl get pods -n $NAMESPACE -l app=$APP_NAME
+            echo ""
+            echo "Describing pods for more details..."
+            kubectl describe pods -n $NAMESPACE -l app=$APP_NAME
+            echo ""
+            echo "Checking events..."
+            kubectl get events -n $NAMESPACE --sort-by='.lastTimestamp' | tail -20
+            exit 1
+          }
           
           echo "Deployment complete! Application available at https://$INGRESS_HOST"
