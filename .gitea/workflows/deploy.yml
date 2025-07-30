@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ci.gmac.io
-  IMAGE_NAME: mackieg/power-grid-web
+  IMAGE_NAME: ${{ gitea.repository }}
 
 jobs:
   build-and-deploy:
@@ -55,7 +55,12 @@ jobs:
           echo "Image tags that were pushed:"
           echo "${{ steps.meta.outputs.tags }}"
           echo ""
-          echo "Using image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+          echo "Will deploy with image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+          echo ""
+          # Extract the first tag to use for deployment
+          FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1 | cut -d':' -f2)
+          echo "DEPLOY_TAG=$FIRST_TAG" >> $GITHUB_ENV
+          echo "Using tag: $FIRST_TAG"
 
       - name: Deploy to K3s
         env:
@@ -104,7 +109,7 @@ jobs:
               spec:
                 containers:
                 - name: web
-                  image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+                  image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEPLOY_TAG || 'latest' }}
                   imagePullPolicy: Always
                   ports:
                   - containerPort: 80
