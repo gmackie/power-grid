@@ -5,12 +5,15 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy the API client dependency first
+COPY power-grid-api /power-grid-api
+
+# Copy React client package files
+COPY react_client/package*.json ./
 RUN npm ci
 
-# Copy source code
-COPY . .
+# Copy React client source code
+COPY react_client/ ./
 
 # Build the application
 RUN npm run build

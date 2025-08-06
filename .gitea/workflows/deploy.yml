@@ -43,7 +43,8 @@ jobs:
       - name: Build and push React client Docker image
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ../
+          file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -55,12 +56,10 @@ jobs:
           echo "Image tags that were pushed:"
           echo "${{ steps.meta.outputs.tags }}"
           echo ""
-          echo "Will deploy with image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
-          echo ""
-          # Extract the first tag to use for deployment
-          FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1 | cut -d':' -f2)
-          echo "DEPLOY_TAG=$FIRST_TAG" >> $GITHUB_ENV
-          echo "Using tag: $FIRST_TAG"
+          # Extract the first full image URL to use for deployment
+          DEPLOY_IMAGE=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "DEPLOY_IMAGE=$DEPLOY_IMAGE" >> $GITHUB_ENV
+          echo "Will deploy with image: $DEPLOY_IMAGE"
 
       - name: Deploy to K3s
         env:
@@ -119,7 +118,7 @@ jobs:
               spec:
                 containers:
                 - name: web
-                  image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEPLOY_TAG || 'latest' }}
+                  image: ${{ env.DEPLOY_IMAGE }}
                   imagePullPolicy: Always
                   ports:
                   - containerPort: 80
