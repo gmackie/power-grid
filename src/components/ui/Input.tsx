@@ -15,7 +15,8 @@ const Input: React.FC<InputProps> = ({
   id,
   ...props
 }) => {
-  const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
+  const generatedId = React.useId();
+  const inputId = id || generatedId;
 
   return (
     <div className="space-y-1">
@@ -31,7 +32,7 @@ const Input: React.FC<InputProps> = ({
       <input
         id={inputId}
         className={cn(
-          'w-full px-3 py-2 min-h-[44px]',
+          'w-full px-3 py-2 min-h-[44px] text-base',
           'bg-game-surface border border-slate-600 rounded-lg',
           'text-white placeholder-slate-400',
           'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',

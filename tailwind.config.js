@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        // Phones in landscape: trim chrome so the game itself gets the height.
+        short: { raw: '(max-height: 500px)' },
+      },
       colors: {
         border: 'hsl(var(--border))',
         game: {

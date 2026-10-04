@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { GameState, Player, AppState, LobbyState, Lobby, LobbyListItem, ResourceType } from '../types/game';
+import type { GameState, Player, AppState, LobbyState, Lobby, LobbyListItem, ResourceType , MapInfo } from '../types/game';
 import { wsManager, lobbyActions } from '../services/websocket';
 import { gameSocket } from '../services/gameSocket';
 import { adaptGameState } from '../utils/gameStateAdapter';
@@ -11,26 +11,38 @@ import type { ConnectionStatus } from '../services/websocket';
 import { PhaseManager } from '../utils/phaseManager';
 import { TurnManager } from '../utils/turnManager';
 
+const ACTIVE_GAME_KEY = 'powerGridActiveGame';
+interface ActiveGame { gameId: string; playerId: string; playerName: string }
+const readActiveGame = (): ActiveGame | null => {
+  try { return JSON.parse(localStorage.getItem(ACTIVE_GAME_KEY) ?? 'null'); } catch { return null; }
+};
+
 interface GameStore extends AppState {
+  /** Join the game socket and remember the game so a reload or killed tab can resume it. */
+  enterGame: (gameId: string, playerId: string, playerName: string) => void;
+  /** Resume a remembered game (app start / returning to the foreground). */
+  resumeGame: () => void;
+  leaveGame: () => void;
   // Connection state
   connect: () => Promise<void>;
   disconnect: () => void;
   
   // Lobby state
   lobbies: LobbyListItem[];
+  availableMaps: MapInfo[];
   currentLobby: LobbyState | null;
   isPlayerRegistered: boolean;
   
   // Game actions
   createGame: (playerName: string, playerColor: string) => void;
-  joinGame: (gameId: string, playerName: string, playerColor: string) => void;
+  joinGame: (lobbyCode: string, playerName: string, playerColor: string, password?: string) => void;
   startGame: () => void;
   
   // Lobby actions
   registerPlayer: (playerName: string) => void;
   listLobbies: () => void;
-  createLobby: (lobbyName: string, maxPlayers: number, mapId: string, password?: string) => void;
-  joinLobby: (lobbyId: string, password?: string) => void;
+  createLobby: (lobbyName: string, maxPlayers: number, mapId: string, password?: string) => boolean;
+  joinLobby: (lobbyId: string, password?: string) => boolean;
   leaveLobby: () => void;
   setReady: (ready: boolean) => void;
   
@@ -58,6 +70,7 @@ interface GameStore extends AppState {
   setError: (error: string) => void;
   clearError: () => void;
   setLobbies: (lobbies: LobbyListItem[]) => void;
+  requestMaps: () => void;
   setCurrentLobby: (lobby: LobbyState | null) => void;
   
   // Helper getters
@@ -80,6 +93,7 @@ export const useGameStore = create<GameStore>()(
     playerName: localStorage.getItem('powerGridPlayerName') || undefined,
     errorMessage: undefined,
     lobbies: [],
+    availableMaps: [],
     currentLobby: null,
     isPlayerRegistered: false,
 
@@ -89,13 +103,6 @@ export const useGameStore = create<GameStore>()(
         set({ connectionStatus: 'connecting', errorMessage: undefined });
         await wsManager.connect();
         
-        // Auto-register player if we have a saved name
-        const { playerName } = get();
-        if (playerName) {
-          setTimeout(() => {
-            get().registerPlayer(playerName);
-          }, 100);
-        }
       } catch (error) {
         console.error('Connection failed:', error);
         set({ 
@@ -132,19 +139,11 @@ export const useGameStore = create<GameStore>()(
       }
     },
     
-    createLobby: (lobbyName: string, maxPlayers: number, mapId: string, password?: string) => {
-      const { playerName, isPlayerRegistered } = get();
-      if (playerName && isPlayerRegistered) {
-        lobbyActions.createLobby(lobbyName, playerName, maxPlayers, mapId, password);
-      }
-    },
+    createLobby: (lobbyName: string, maxPlayers: number, mapId: string, password?: string) =>
+      sendLobbyRequest((name) => lobbyActions.createLobby(lobbyName, name, maxPlayers, mapId, password)),
     
-    joinLobby: (lobbyId: string, password?: string) => {
-      const { playerName, isPlayerRegistered } = get();
-      if (playerName && isPlayerRegistered) {
-        lobbyActions.joinLobby(lobbyId, playerName, password);
-      }
-    },
+    joinLobby: (lobbyId: string, password?: string) =>
+      sendLobbyRequest((name) => lobbyActions.joinLobby(lobbyId, name, password)),
     
     leaveLobby: () => {
       lobbyActions.leaveLobby();
@@ -170,9 +169,11 @@ export const useGameStore = create<GameStore>()(
       }, 100);
     },
 
-    joinGame: (_gameId: string, playerName: string) => {
-      // Legacy: games are joined through lobbies now.
+    joinGame: (lobbyCode: string, playerName: string, _playerColor: string, password?: string) => {
+      // Games are joined through lobbies; the code is the six-character lobby id.
+      // CONNECT and JOIN_LOBBY go out on the same socket, so the server sees them in order.
       get().registerPlayer(playerName);
+      get().joinLobby(lobbyCode.trim().toUpperCase(), password);
     },
 
     startGame: () => {
@@ -332,6 +333,26 @@ export const useGameStore = create<GameStore>()(
       }
     },
 
+    enterGame: (gameId, playerId, playerName) => {
+      localStorage.setItem(ACTIVE_GAME_KEY, JSON.stringify({ gameId, playerId, playerName }));
+      set({ gamePlayerId: playerId, currentScreen: 'game' });
+      gameSocket.connect(playerId, playerName, gameId).catch(() => set({ errorMessage: 'Failed to connect to game' }));
+    },
+
+    resumeGame: () => {
+      const active = readActiveGame();
+      if (!active) return;
+      const { currentScreen, gameConnection } = get();
+      if (currentScreen === 'game' && (gameConnection === 'connected' || gameConnection === 'connecting')) return;
+      get().enterGame(active.gameId, active.playerId, active.playerName);
+    },
+
+    leaveGame: () => {
+      localStorage.removeItem(ACTIVE_GAME_KEY);
+      gameSocket.disconnect();
+      set({ gameState: undefined, gamePlayerId: undefined, currentLobby: null, currentScreen: 'menu' });
+    },
+
     // UI state management
     setCurrentScreen: (screen) => {
       set({ currentScreen: screen });
@@ -365,6 +386,10 @@ export const useGameStore = create<GameStore>()(
       set({ errorMessage: undefined });
     },
     
+    requestMaps: () => {
+      lobbyActions.listMaps();
+    },
+
     setLobbies: (lobbies) => {
       set({ lobbies });
     },
@@ -375,22 +400,25 @@ export const useGameStore = create<GameStore>()(
 
     // Helper getters
     getCurrentPlayer: () => {
-      const { gameState, playerId } = get();
+      const { gameState } = get();
+      const playerId = get().gamePlayerId ?? get().playerId;
       if (!gameState || !playerId) return undefined;
       
       return gameState.players.find(p => p.id === playerId);
     },
 
     isCurrentPlayerTurn: () => {
-      const { gameState, playerId } = get();
+      const { gameState } = get();
+      const playerId = get().gamePlayerId ?? get().playerId;
       if (!gameState || !playerId) return false;
       return gameState.currentTurn === playerId;
     },
 
     canPerformAction: () => {
       const state = get();
-      return state.connectionStatus === 'connected' && 
-             state.gameState !== undefined && 
+      // Moves go over the game socket; the lobby socket may be down mid-game.
+      return gameSocket.isConnected() &&
+             state.gameState !== undefined &&
              state.isCurrentPlayerTurn();
     },
 
@@ -426,6 +454,33 @@ export const useGameStore = create<GameStore>()(
 );
 
 // Set up WebSocket event handlers
+// Pending lobby request (create/join), replayed once if the server lost our session.
+let pendingLobbyRequest: { run: () => boolean; retried: boolean } | null = null;
+
+function sendLobbyRequest(send: (playerName: string) => boolean): boolean {
+  const { playerName, isPlayerRegistered, registerPlayer } = useGameStore.getState();
+  if (!playerName) {
+    useGameStore.setState({ errorMessage: 'Enter your name first' });
+    return false;
+  }
+  if (!isPlayerRegistered) registerPlayer(playerName);
+  const run = () => send(useGameStore.getState().playerName ?? playerName);
+  pendingLobbyRequest = { run, retried: false };
+  if (!run()) {
+    pendingLobbyRequest = null;
+    useGameStore.setState({ errorMessage: 'Not connected to the server. Check your connection and try again.' });
+    return false;
+  }
+  return true;
+}
+
+// The server forgets idle sessions (and phones background tabs for a long time), so
+// re-announce ourselves every time the lobby socket opens, including reconnects.
+wsManager.setOnOpen(() => {
+  const { playerName, registerPlayer } = useGameStore.getState();
+  if (playerName) registerPlayer(playerName);
+});
+
 wsManager.setOnConnectionChange((status) => {
   useGameStore.getState().setConnectionStatus(status);
 });
@@ -474,6 +529,7 @@ wsManager.setOnMessage((message) => {
       break;
       
     case 'LOBBY_CREATED':
+      pendingLobbyRequest = null;
       console.log('Lobby created:', message.data);
       if (message.data?.lobby) {
         // Transform server lobby format to client LobbyState format
@@ -513,6 +569,7 @@ wsManager.setOnMessage((message) => {
       break;
       
     case 'LOBBY_JOINED':
+      pendingLobbyRequest = null;
       console.log('Lobby joined:', message.data);
       if (message.data?.lobby) {
         // Transform server lobby format to client LobbyState format
@@ -675,10 +732,7 @@ wsManager.setOnMessage((message) => {
       if (message.data?.game_id) {
         const { playerId, playerName } = useGameStore.getState();
         if (playerId) {
-          gameSocket
-            .connect(playerId, playerName || 'Player', message.data.game_id as string)
-            .catch(() => store.setError('Failed to connect to game'));
-          store.setCurrentScreen('game');
+          store.enterGame(message.data.game_id as string, playerId, playerName || 'Player');
         } else {
           store.setError('Cannot join game: player id unknown');
         }
@@ -695,9 +749,27 @@ wsManager.setOnMessage((message) => {
       console.log('Game ended:', message.data);
       break;
       
-    case 'ERROR':
-      store.setError((message.data as { message?: string } | undefined)?.message || message.error || 'Server error');
+    case 'MAPS_LISTED': {
+      const maps = (message.data as { maps?: MapInfo[] } | undefined)?.maps;
+      if (Array.isArray(maps)) useGameStore.setState({ availableMaps: maps });
       break;
+    }
+
+    case 'ERROR': {
+      const errorText = (message.data as { message?: string } | undefined)?.message || message.error || 'Server error';
+      // "No active session found…" / "Player session not found…": re-register and replay once.
+      if (/session/i.test(errorText) && store.playerName) {
+        store.registerPlayer(store.playerName);
+        if (pendingLobbyRequest && !pendingLobbyRequest.retried) {
+          pendingLobbyRequest.retried = true;
+          pendingLobbyRequest.run();
+          break;
+        }
+      }
+      pendingLobbyRequest = null;
+      store.setError(errorText);
+      break;
+    }
 
     default:
       console.log('Unhandled message:', message.type, message.data);
@@ -706,6 +778,7 @@ wsManager.setOnMessage((message) => {
 
 // Game socket handlers
 gameSocket.setHandlers({
+  onStatus: (status) => useGameStore.setState({ gameConnection: status }),
   onError: (error) => useGameStore.getState().setError(error),
   onMessage: (message) => {
     const store = useGameStore.getState();
@@ -715,9 +788,17 @@ gameSocket.setHandlers({
           store.setGameState(adaptGameState(message.data as ServerGameState));
         }
         break;
-      case 'ERROR':
-        store.setError(message.data?.message || message.error || 'Server error');
+      case 'ERROR': {
+        const text: string = message.data?.message || message.error || 'Server error';
+        // A remembered game that no longer exists: drop it instead of leaving the player stuck.
+        if (/^game not found|session not in any game/i.test(text) && !store.gameState) {
+          store.leaveGame();
+          store.setError('That game is no longer available.');
+          break;
+        }
+        store.setError(text);
         break;
+      }
       default:
         break;
     }

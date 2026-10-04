@@ -147,6 +147,9 @@ export function adaptGameState(s: ServerGameState): GameState {
         hybrid: 0,
         eco: 0,
       },
+      hasPassed: p.has_passed ?? false,
+      poweredCities: p.powered_cities ?? 0,
+      connected: p.connected ?? true,
     };
   });
 
@@ -160,7 +163,7 @@ export function adaptGameState(s: ServerGameState): GameState {
     x: c.position?.[0] ?? 0,
     y: c.position?.[1] ?? 0,
     connections: [],
-    houses: (c.slots || []).map((pid) => ({ playerColor: colorOf(pid), cost: 0 })),
+    houses: (c.slots || []).map((pid) => ({ playerColor: colorOf(pid), cost: 0, playerId: pid })),
   }));
   const cityById = new Map(cities.map((c) => [c.id, c]));
   for (const conn of s.map?.connections ?? []) {
@@ -186,6 +189,7 @@ export function adaptGameState(s: ServerGameState): GameState {
       biddingOrder: s.auction.participants || [],
       passedPlayers: s.auction.passed || [],
       plantsWon: {},
+      nominatedBy: s.auction.nominated_by,
     };
   }
 
@@ -209,6 +213,14 @@ export function adaptGameState(s: ServerGameState): GameState {
     futureMarket: future,
     winnerId: s.winner_id,
     activeRegions: s.active_regions ?? [],
+    mapId: s.map_id,
     serverPhase: s.current_phase,
+    resourceLadders: {
+      coal: s.market?.resources?.Coal ?? [],
+      oil: s.market?.resources?.Oil ?? [],
+      garbage: s.market?.resources?.Garbage ?? [],
+      uranium: s.market?.resources?.Uranium ?? [],
+    },
+    deckRemaining: s.plant_market?.deck_remaining,
   };
 }

@@ -1,426 +1,138 @@
 import React from 'react';
-import { useGameStore, useDeviceStore } from '../store/gameStore';
-import { ArrowLeft, Users, Coins, Zap, Factory } from 'lucide-react';
-import Button from './ui/Button';
-import Card from './ui/Card';
+import { ArrowLeft, Coins, Trophy, WifiOff } from 'lucide-react';
+import { useGameStore } from '../store/gameStore';
 import AuctionPhase from './phases/AuctionPhase';
 import ResourcePhase from './phases/ResourcePhase';
 import BuildingPhase from './phases/BuildingPhase';
 import BureaucracyPhase from './phases/BureaucracyPhase';
-import { gameSocket } from '../services/gameSocket';
-import type { GameState, City } from '../types/game';
+import Button from './ui/Button';
+import { ActionBar, PlayerStrip, Section } from './game/GameChrome';
+import { useGameView } from '../hooks/useGameView';
+import { END_GAME_CITIES } from '../utils/rules';
+
+const PHASE_LABEL: Record<string, string> = {
+  PLAYER_ORDER: 'Player order',
+  AUCTION: 'Auction',
+  BUY_RESOURCES: 'Buy resources',
+  BUILD_CITIES: 'Build',
+  BUREAUCRACY: 'Bureaucracy',
+  GAME_END: 'Game over',
+};
+
+/** What the acting player is being asked to do, for the turn banner. */
+function promptFor(phase: string | undefined, auction: boolean): string {
+  switch (phase) {
+    case 'AUCTION': return auction ? 'raise the bid or pass' : 'pick a plant to auction';
+    case 'BUY_RESOURCES': return 'buy fuel for your plants';
+    case 'BUILD_CITIES': return 'build in cities';
+    case 'BUREAUCRACY': return 'power your cities';
+    default: return 'make a move';
+  }
+}
 
 const GameScreen: React.FC = () => {
-  const { 
-    gameState, 
-    getCurrentPlayer,
-    isCurrentPlayerTurn,
-    setCurrentScreen,
-    connectionStatus,
-    startGame
-  } = useGameStore();
-  
-  const [localMode, setLocalMode] = React.useState(false);
-  
-  const { isMobile, orientation } = useDeviceStore();
-  
-  const currentPlayer = getCurrentPlayer();
-  const isMyTurn = isCurrentPlayerTurn();
+  const leaveGame = useGameStore((s) => s.leaveGame);
+  const gameConnection = useGameStore((s) => s.gameConnection);
+  const { gameState, myId, me, acting, actingId, isMyTurn } = useGameView();
 
-  // Mock cities for development
-  const mockCitiesData: City[] = [
-    { id: 'berlin', name: 'Berlin', region: 'yellow', connections: [], x: 0.5, y: 0.3, houses: [] },
-    { id: 'hamburg', name: 'Hamburg', region: 'yellow', connections: [], x: 0.4, y: 0.2, houses: [] },
-    { id: 'munich', name: 'Munich', region: 'yellow', connections: [], x: 0.6, y: 0.7, houses: [] }
-  ];
-
-  // Use real game state or fallback to mock for development
-  const currentGameState: GameState = gameState || {
-    id: 'mock-game',
-    currentRound: 1,
-    phase: 'auction' as const,
-    currentPlayer: 0,
-    turnOrder: ['1', '2'],
-    players: [
-      {
-        id: '1',
-        name: 'Player 1',
-        color: '#ff0000',
-        money: 50,
-        cities: ['Berlin', 'Hamburg'],
-        powerPlants: [
-          { id: 1, number: 3, cost: 10, resourceType: 'oil' as const, resourceCount: 2, citiesPowered: 1 }
-        ],
-        resources: { coal: 0, oil: 2, garbage: 0, uranium: 0, hybrid: 0, eco: 0 }
-      },
-      {
-        id: '2',
-        name: 'Player 2',
-        color: '#0000ff',
-        money: 45,
-        cities: ['Munich'],
-        powerPlants: [],
-        resources: { coal: 0, oil: 0, garbage: 0, uranium: 0, hybrid: 0, eco: 0 }
-      }
-    ],
-    powerPlantMarket: [
-      { id: 2, number: 4, cost: 15, resourceType: 'coal' as const, resourceCount: 2, citiesPowered: 1 },
-      { id: 3, number: 5, cost: 20, resourceType: 'hybrid' as const, resourceCount: 2, citiesPowered: 1 },
-      { id: 4, number: 6, cost: 25, resourceType: 'garbage' as const, resourceCount: 1, citiesPowered: 1 }
-    ],
-    resourceMarket: {
-      coal: 24,
-      oil: 18,
-      garbage: 6,
-      uranium: 2,
-      hybrid: 0,
-      eco: 0,
-      coalPrice: 1,
-      oilPrice: 2,
-      garbagePrice: 3,
-      uraniumPrice: 8,
-      hybridPrice: 0,
-      ecoPrice: 0
-    },
-    cities: mockCitiesData
+  const handleLeave = () => {
+    if (gameState?.status === 'PLAYING' && !window.confirm('Leave this game? You can rejoin from this device later.')) return;
+    leaveGame();
   };
 
-  const handleLeaveGame = () => {
-    gameSocket.disconnect();
-    setCurrentScreen('menu');
-  };
+  if (!gameState) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-game-background p-6 text-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-700 border-l-blue-500" />
+        <p className="text-slate-300">{gameConnection === 'error' ? 'Could not reach the game.' : 'Joining game…'}</p>
+        <Button variant="outline" onClick={leaveGame}>Back to menu</Button>
+      </div>
+    );
+  }
 
-  const renderPhaseContent = () => {
-    switch (currentGameState.phase) {
-      case 'auction':
-        return (
-          <AuctionPhase
-            auctionState={currentGameState.auctionState || {
-              currentPlant: undefined,
-              currentBid: 0,
-              currentBidder: undefined,
-              biddingOrder: currentGameState.players.map(p => p.id),
-              passedPlayers: [],
-              plantsWon: {}
-            }}
-            powerPlantMarket={currentGameState.powerPlantMarket}
-            localMode={localMode}
-          />
-        );
-        
-      case 'resource':
-        return (
-          <ResourcePhase
-            resourcePhaseState={currentGameState.resourcePhaseState || {
-              buyingOrder: currentGameState.players.map(p => p.id).reverse(), // Reverse turn order
-              currentBuyer: undefined,
-              resourcesPurchased: {}
-            }}
-            resourceMarket={currentGameState.resourceMarket || {
-              coal: 24,
-              oil: 18,
-              garbage: 6,
-              uranium: 2,
-              hybrid: 0,
-              eco: 0,
-              coalPrice: 1,
-              oilPrice: 2,
-              garbagePrice: 3,
-              uraniumPrice: 8,
-              hybridPrice: 0,
-              ecoPrice: 0
-            }}
-            localMode={localMode}
-          />
-        );
-        
-      case 'building':
-        return (
-          <BuildingPhase
-            buildingPhaseState={currentGameState.buildingPhaseState || {
-              buildingOrder: currentGameState.players.map(p => p.id).reverse(), // Reverse turn order
-              currentBuilder: undefined,
-              citiesBuilt: {}
-            }}
-            cities={currentGameState.cities || mockCities}
-            localMode={localMode}
-          />
-        );
-        
-      case 'bureaucracy':
-        return (
-          <BureaucracyPhase
-            bureaucracyState={currentGameState.bureaucracyState || {
-              poweringOrder: currentGameState.players.map(p => p.id),
-              currentPowerer: undefined,
-              citiesPowered: {},
-              earnings: {}
-            }}
-            localMode={localMode}
-          />
-        );
-        
-      default:
-        return (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">
-              Unknown Phase
-            </h3>
-            <p className="text-slate-400">
-              Invalid game phase: {(currentGameState as any).phase}
-            </p>
-          </Card>
-        );
+  const phase = gameState.serverPhase;
+  const finished = gameState.status === 'FINISHED';
+  const winner = gameState.players.find((p) => p.id === gameState.winnerId);
+  const target = END_GAME_CITIES[gameState.players.length];
+
+  const renderPhase = () => {
+    if (finished) return null;
+    switch (gameState.phase) {
+      case 'auction': return <AuctionPhase />;
+      case 'resource': return <ResourcePhase />;
+      case 'building': return <BuildingPhase />;
+      case 'bureaucracy': return <BureaucracyPhase />;
     }
   };
-  
-  // Mock cities data for testing
-  const mockCities = [
-    {
-      id: 'berlin',
-      name: 'Berlin',
-      x: 0.5,
-      y: 0.3,
-      region: 'North',
-      houses: [],
-      connections: [
-        { to: 'hamburg', cost: 10 },
-        { to: 'munich', cost: 15 }
-      ]
-    },
-    {
-      id: 'hamburg',
-      name: 'Hamburg',
-      x: 0.4,
-      y: 0.2,
-      region: 'North',
-      houses: [],
-      connections: [
-        { to: 'berlin', cost: 10 },
-        { to: 'cologne', cost: 12 }
-      ]
-    },
-    {
-      id: 'munich',
-      name: 'Munich',
-      x: 0.6,
-      y: 0.5,
-      region: 'South',
-      houses: [],
-      connections: [
-        { to: 'berlin', cost: 15 },
-        { to: 'frankfurt', cost: 8 }
-      ]
-    },
-    {
-      id: 'cologne',
-      name: 'Cologne',
-      x: 0.3,
-      y: 0.4,
-      region: 'West',
-      houses: [],
-      connections: [
-        { to: 'hamburg', cost: 12 },
-        { to: 'frankfurt', cost: 6 }
-      ]
-    },
-    {
-      id: 'frankfurt',
-      name: 'Frankfurt',
-      x: 0.5,
-      y: 0.4,
-      region: 'Central',
-      houses: [],
-      connections: [
-        { to: 'munich', cost: 8 },
-        { to: 'cologne', cost: 6 }
-      ]
-    }
-  ];
 
   return (
-    <div className="min-h-screen bg-game-background">
-      {/* Header */}
-      <div className="bg-game-surface border-b border-slate-600 p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={handleLeaveGame}
-            className="touch-target"
+    <div className="min-h-[100dvh] bg-game-background">
+      {/* Sticky header */}
+      <header className="sticky top-0 z-30 border-b border-slate-700 bg-game-surface pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2 short:py-1 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
+          <button
+            onClick={handleLeave}
+            aria-label="Leave game"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-600 text-white active:bg-slate-700"
           >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Leave
-          </Button>
-          
-          <div className="text-center">
-            <h1 className="text-xl font-bold text-white">
-              Power Grid
-            </h1>
-            <p className="text-sm text-slate-400">
-              Round {currentGameState.currentRound} • {currentGameState.phase} Phase
-              {currentGameState.step !== undefined && ` • Step ${currentGameState.step}`}
-              {currentGameState.status && ` • ${currentGameState.status}`}
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            <p className="truncate text-sm font-semibold text-white">{PHASE_LABEL[phase ?? ''] ?? 'Power Grid'}</p>
+            <p className="truncate text-xs text-slate-400 short:hidden">
+              Round {gameState.currentRound} · Step {gameState.step ?? 1}
+              {target ? ` · ${target} cities ends it` : ''}
             </p>
-            {/* Development mode toggle */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-2">
-                <label className="flex items-center gap-2 text-xs text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={localMode}
-                    onChange={(e) => setLocalMode(e.target.checked)}
-                    className="rounded"
-                  />
-                  Local Mode (No Server Sync)
-                </label>
-              </div>
-            )}
           </div>
-          
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${
-              connectionStatus === 'connected' ? 'bg-green-400' : 
-              connectionStatus === 'connecting' ? 'bg-yellow-400' : 
-              'bg-red-400'
-            }`} />
-            <Users className="w-5 h-5 text-slate-400" />
-            <span className="text-sm text-slate-400">
-              {currentGameState.players.length}
-            </span>
+          <div className="flex h-11 shrink-0 items-center gap-1 rounded-lg bg-yellow-400/10 px-3 font-bold text-yellow-400">
+            <Coins className="h-4 w-4" />${me?.money ?? 0}
           </div>
         </div>
-      </div>
-
-      <div className={`
-        max-w-7xl mx-auto p-4 space-y-6
-        ${isMobile && orientation === 'portrait' ? 'space-y-4' : ''}
-      `}>
-        {/* Lobby: start game */}
-        {gameState?.status === 'LOBBY' && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-slate-300">
-                Waiting to start ({gameState.players.length} players connected)
-              </p>
-              <Button onClick={startGame} className="touch-target">
-                Start game
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Winner banner */}
-        {gameState?.status === 'FINISHED' && (
-          <Card className="p-4 bg-yellow-600 border-yellow-500">
-            <p className="text-center text-white font-bold text-lg">
-              Game over!{' '}
-              {gameState.players.find(p => p.id === gameState.winnerId)?.name ?? 'Unknown'} wins!
+        {/* Turn banner */}
+        {!finished && (
+          <div className={isMyTurn ? 'bg-green-600 text-white' : 'bg-slate-800 text-slate-300'}>
+            <p className="mx-auto max-w-3xl px-3 py-1.5 text-center text-sm font-medium short:py-0.5 short:text-xs">
+              {isMyTurn
+                ? `Your turn: ${promptFor(phase, !!gameState.auctionState)}`
+                : acting
+                  ? `Waiting for ${acting.name} to ${promptFor(phase, !!gameState.auctionState)}…`
+                  : 'Waiting…'}
             </p>
-          </Card>
+          </div>
         )}
+        {gameConnection && gameConnection !== 'connected' && (
+          <div className="flex items-center justify-center gap-2 bg-red-700 px-3 py-1 text-xs text-white">
+            <WifiOff className="h-3.5 w-3.5" /> Reconnecting to the game…
+          </div>
+        )}
+      </header>
 
-        {/* Turn Indicator */}
-        {isMyTurn && (
-          <Card className="p-4 bg-green-600 border-green-500">
-            <div className="text-center">
-              <p className="text-green-100 font-medium">
-                It's your turn!
+      <main className="mx-auto max-w-3xl space-y-3 px-3 pb-44 pt-3 short:pb-28 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
+        <PlayerStrip state={gameState} myId={myId} actingId={finished ? undefined : actingId} />
+
+        {finished && (
+          <Section>
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <Trophy className="h-10 w-10 text-yellow-400" />
+              <p className="text-xl font-bold text-white">{winner ? `${winner.name} wins!` : 'Game over'}</p>
+              <p className="text-sm text-slate-400">
+                {[...gameState.players]
+                  .sort((a, b) => (b.poweredCities ?? 0) - (a.poweredCities ?? 0) || b.money - a.money)
+                  .map((p) => `${p.name}: ${p.poweredCities ?? 0} powered, $${p.money}`)
+                  .join(' · ')}
               </p>
             </div>
-          </Card>
+          </Section>
         )}
 
-        {/* Current Player Info */}
-        {currentPlayer && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-8 h-8 rounded-full border-2 border-white"
-                  style={{ backgroundColor: currentPlayer.color }}
-                />
-                <div>
-                  <h2 className="text-lg font-semibold text-white">
-                    {currentPlayer.name}
-                  </h2>
-                  <p className="text-sm text-slate-400">
-                    Cities: {currentPlayer.cities.length} • Plants: {currentPlayer.powerPlants.length}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 text-yellow-400">
-                <Coins className="w-5 h-5" />
-                <span className="font-semibold">
-                  ${currentPlayer.money}
-                </span>
-              </div>
-            </div>
-          </Card>
-        )}
+        {renderPhase()}
+      </main>
 
-        {/* Phase Content */}
-        {renderPhaseContent()}
-
-        {/* Players Overview */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">
-            Players
-          </h3>
-          
-          <div className={`
-            grid gap-4
-            ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}
-          `}>
-            {currentGameState.players.map((player, index) => (
-              <div
-                key={player.id}
-                className={`
-                  bg-game-surface rounded-lg p-4 border
-                  ${index === currentGameState.currentPlayer 
-                    ? 'border-yellow-500 bg-yellow-900/20' 
-                    : 'border-slate-600'
-                  }
-                `}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-6 h-6 rounded-full border-2 border-white"
-                      style={{ backgroundColor: player.color }}
-                    />
-                    <span className="text-white font-medium">
-                      {player.name}
-                      {player.id === currentPlayer?.id && ' (You)'}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-center gap-1 text-yellow-400">
-                      <Coins className="w-4 h-4" />
-                      <span>${player.money}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1 text-blue-400">
-                      <Factory className="w-4 h-4" />
-                      <span>{player.powerPlants.length}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1 text-green-400">
-                      <Zap className="w-4 h-4" />
-                      <span>{player.cities.length}</span>
-                    </div>
-                    
-                    <div className="text-slate-400">
-                      Resources: {Object.values(player.resources).reduce((a: number, b: number) => a + b, 0)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
+      {finished && (
+        <ActionBar>
+          <Button className="w-full" onClick={leaveGame}>Back to menu</Button>
+        </ActionBar>
+      )}
     </div>
   );
 };

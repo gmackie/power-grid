@@ -1,359 +1,148 @@
-import React, { useState, useMemo } from 'react';
-import { useGameStore, useDeviceStore } from '../../store/gameStore';
-import type { BuildingPhaseState, City } from '../../types/game';
-import { Building2, MapPin, DollarSign, Check, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Building2, MapPin, ZoomIn, ZoomOut } from 'lucide-react';
+import { useGameStore } from '../../store/gameStore';
+import type { City } from '../../types/game';
 import Button from '../ui/Button';
-import Card from '../ui/Card';
 import GameBoard from '../GameBoard';
-import useGameActions from '../../hooks/useGameActions';
+import { ActionBar, ColorDot, Section } from '../game/GameChrome';
+import { useGameView } from '../../hooks/useGameView';
+import { cn } from '../../utils/cn';
+import { checkBuild, type BuildCheck } from '../../utils/rules';
 
-interface BuildingPhaseProps {
-  buildingPhaseState: BuildingPhaseState;
-  cities: City[];
-  localMode?: boolean;
-}
+const BuildingPhase: React.FC = () => {
+  const { gameState, me, isMyTurn } = useGameView();
+  const buildCity = useGameStore((s) => s.buildCity);
+  const endTurn = useGameStore((s) => s.endTurn);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [showAll, setShowAll] = useState(false);
 
-const BuildingPhase: React.FC<BuildingPhaseProps> = ({ buildingPhaseState, cities, localMode = false }) => {
-  const { 
-    getCurrentPlayer, 
-    isCurrentPlayerTurn,
-    playerId,
-    gameState
-  } = useGameStore();
-  
-  const { buildCity, endTurn } = useGameActions(localMode);
-  
-  const { isMobile } = useDeviceStore();
-  
-  const [selectedCity, setSelectedCity] = useState<City | null>(null);
-  const [hoveredCity, setHoveredCity] = useState<City | null>(null);
-  
-  const currentPlayer = getCurrentPlayer();
-  const isMyTurn = isCurrentPlayerTurn();
-  const myBuiltCities = Array.from(new Set([
-    ...(buildingPhaseState.citiesBuilt[playerId || ''] || []),
-    ...(currentPlayer?.cities || [])
-  ]));
-  
-  // Calculate building cost for a city
-  const calculateBuildingCost = (city: City): number => {
-    if (!currentPlayer) return 0;
-    
-    const housesInCity = city.houses.length;
-    const houseCost = 10 + (housesInCity * 5); // Base 10, +5 per existing house
-    
-    // Connection cost (find cheapest path to player's network)
-    let connectionCost = 0;
-    if (currentPlayer.cities.length > 0) {
-      connectionCost = findCheapestConnection(city, currentPlayer.cities);
-    }
-    
-    return houseCost + connectionCost;
+  const cities = useMemo(() => gameState?.cities ?? [], [gameState?.cities]);
+  const checks = useMemo(() => {
+    const out = new Map<string, BuildCheck>();
+    if (gameState && me) for (const c of cities) out.set(c.id, checkBuild(gameState, me, c));
+    return out;
+  }, [gameState, me, cities]);
+
+  const outOfPlay = useMemo(() => {
+    const regions = gameState?.activeRegions ?? [];
+    return new Set(cities.filter((c) => regions.length > 0 && !regions.includes(c.region)).map((c) => c.id));
+  }, [cities, gameState?.activeRegions]);
+  const buildable = useMemo(
+    () => new Set(isMyTurn ? [...checks].filter(([, r]) => r.ok).map(([id]) => id) : []),
+    [checks, isMyTurn]
+  );
+
+  if (!gameState || !me) return null;
+
+  const selected = cities.find((c) => c.id === selectedId);
+  const selectedCheck = selected ? checks.get(selected.id) : undefined;
+  const mine = cities.filter((c) => me.cities.includes(c.id));
+
+  const rows = cities
+    .filter((c) => !outOfPlay.has(c.id) && !me.cities.includes(c.id))
+    .map((c) => ({ city: c, check: checks.get(c.id)! }))
+    .filter((r) => showAll || r.check.ok)
+    .sort((a, b) => Number(b.check.ok) - Number(a.check.ok) || (a.check.cost ?? 999) - (b.check.cost ?? 999) || a.city.name.localeCompare(b.city.name));
+
+  const select = (c: City) => setSelectedId(c.id === selectedId ? null : c.id);
+  const build = () => {
+    if (!selected || !selectedCheck?.ok) return;
+    buildCity(selected.id);
+    setSelectedId(null);
   };
-  
-  // Find cheapest connection to player's network (simplified)
-  const findCheapestConnection = (targetCity: City, playerCities: string[]): number => {
-    // In a real implementation, this would use Dijkstra's algorithm
-    // For now, return a simple calculation
-    let minCost = Infinity;
-    
-    cities.forEach(city => {
-      if (playerCities.includes(city.id)) {
-        const connection = city.connections.find(c => c.to === targetCity.id);
-        if (connection && connection.cost < minCost) {
-          minCost = connection.cost;
-        }
-      }
-    });
-    
-    return minCost === Infinity ? 20 : minCost; // Default connection cost
-  };
-  
-  // Check if player can build in city
-  const canBuildInCity = (city: City): { canBuild: boolean; reason?: string } => {
-    if (!currentPlayer) return { canBuild: false, reason: 'No current player' };
-    
-    // Check if already built this turn
-    if (myBuiltCities.includes(city.id)) {
-      return { canBuild: false, reason: 'Already built here this turn' };
-    }
-    
-    // Check if player already has a house in this city
-    if (city.houses.some(h => h.playerColor === currentPlayer.color)) {
-      return { canBuild: false, reason: 'You already own this city' };
-    }
-    
-    // Check if city is full (max 3 houses)
-    if (city.houses.length >= 3) {
-      return { canBuild: false, reason: 'City is full' };
-    }
-    
-    // Check if player has enough money
-    const cost = calculateBuildingCost(city);
-    if (cost > currentPlayer.money) {
-      return { canBuild: false, reason: `Need $${cost} (you have $${currentPlayer.money})` };
-    }
-    
-    // Check step restrictions (simplified - in real game, depends on current step)
-    const currentStep = gameState?.currentRound || 1;
-    if (currentStep === 1 && city.houses.length > 0) {
-      return { canBuild: false, reason: 'Step 1: Can only build in empty cities' };
-    }
-    
-    return { canBuild: true };
-  };
-  
-  const handleCitySelect = (city: City) => {
-    const { canBuild } = canBuildInCity(city);
-    if (canBuild && isMyTurn) {
-      setSelectedCity(city);
-    }
-  };
-  
-  const handleBuildCity = () => {
-    if (selectedCity && isMyTurn) {
-      buildCity(selectedCity.id);
-      setSelectedCity(null);
-    }
-  };
-  
-  const handlePass = () => {
-    endTurn();
-    setSelectedCity(null);
-  };
-  
-  // Group cities by region for display
-  const citiesByRegion = useMemo(() => {
-    const grouped: Record<string, City[]> = {};
-    cities.forEach(city => {
-      if (!grouped[city.region]) {
-        grouped[city.region] = [];
-      }
-      grouped[city.region].push(city);
-    });
-    return grouped;
-  }, [cities]);
-  
+
   return (
-    <div className="space-y-6">
-      {/* Phase Header */}
-      <Card className="p-4 bg-purple-900/20 border-purple-600">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Building2 className="w-6 h-6 text-purple-400" />
-            <div>
-              <h2 className="text-xl font-bold text-white">Building Phase</h2>
-              <p className="text-sm text-slate-400">
-                Expand your network by building in cities
-              </p>
-            </div>
+    <div className="space-y-3">
+      <Section
+        title="Map"
+        right={
+          <div className="flex gap-1">
+            <button aria-label="Zoom out" className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-600 text-white disabled:opacity-30" disabled={zoom <= 1} onClick={() => setZoom((z) => Math.max(1, z - 0.5))}><ZoomOut className="h-4 w-4" /></button>
+            <button aria-label="Zoom in" className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-600 text-white disabled:opacity-30" disabled={zoom >= 3} onClick={() => setZoom((z) => Math.min(3, z + 0.5))}><ZoomIn className="h-4 w-4" /></button>
           </div>
-          
-          <div className="text-right">
-            <p className="text-sm text-slate-400">Cities Built</p>
-            <p className="text-lg font-semibold text-white">
-              {myBuiltCities.length}
-            </p>
+        }
+      >
+        <div className="-mx-1 overflow-auto overscroll-contain rounded-lg">
+          <div style={{ width: `${zoom * 100}%` }}>
+            <GameBoard
+              cities={cities}
+              mapId={gameState.mapId}
+              selectedId={selectedId}
+              buildable={buildable}
+              outOfPlay={outOfPlay}
+              onSelect={select}
+            />
           </div>
         </div>
-      </Card>
-      
-      {/* Player Status */}
-      {currentPlayer && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-400">Your Money</p>
-              <p className="text-2xl font-bold text-yellow-400">${currentPlayer.money}</p>
-            </div>
-            
-            <div className="text-center">
-              <p className="text-sm text-slate-400">Your Cities</p>
-              <p className="text-2xl font-bold text-blue-400">{currentPlayer.cities.length}</p>
-            </div>
-            
-            {selectedCity && (
-              <div className="text-right">
-                <p className="text-sm text-slate-400">Build Cost</p>
-                <p className="text-2xl font-bold text-green-400">
-                  ${calculateBuildingCost(selectedCity)}
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-      
-      {/* Game Board */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">
-          Game Board
-        </h3>
-        
-        {/* Full game board would go here - simplified for now */}
-        <GameBoard
-          cities={cities}
-          selectedCity={selectedCity}
-          hoveredCity={hoveredCity}
-          onCityClick={handleCitySelect}
-          onCityHover={setHoveredCity}
-          currentPlayer={currentPlayer}
-        />
-      </Card>
-      
-      {/* City List (Mobile-friendly alternative view) */}
-      {isMobile && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">
-            Available Cities
-          </h3>
-          
-          <div className="space-y-4">
-            {Object.entries(citiesByRegion).map(([region, regionCities]) => (
-              <div key={region}>
-                <h4 className="text-sm font-medium text-slate-400 mb-2">{region}</h4>
-                <div className="space-y-2">
-                  {regionCities.map(city => {
-                    const { canBuild, reason } = canBuildInCity(city);
-                    const isSelected = selectedCity?.id === city.id;
-                    
-                    return (
-                      <button
-                        key={city.id}
-                        data-testid="city-item"
-                        className={`
-                          w-full p-3 rounded-lg text-left transition-all
-                          ${isSelected 
-                            ? 'bg-blue-900/50 border-2 border-blue-500' 
-                            : canBuild && isMyTurn
-                              ? 'bg-game-surface hover:bg-slate-700 border-2 border-transparent'
-                              : 'bg-slate-800 opacity-50 cursor-not-allowed border-2 border-transparent'
-                          }
-                        `}
-                        onClick={() => canBuild && isMyTurn && handleCitySelect(city)}
-                        disabled={!canBuild || !isMyTurn}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <MapPin className="w-5 h-5 text-slate-400" />
-                            <div>
-                              <p className="text-white font-medium">{city.name}</p>
-                              <p className="text-xs text-slate-400">
-                                {city.houses.length}/3 houses • Cost: ${calculateBuildingCost(city)}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-1">
-                            {city.houses.map((house, idx) => (
-                              <div
-                                key={idx}
-                                className="w-4 h-4 rounded-full border border-white"
-                                style={{ backgroundColor: house.playerColor }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {!canBuild && reason && (
-                          <p className="text-xs text-red-400 mt-1">{reason}</p>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+        <p className="mt-2 text-xs text-slate-400">
+          {isMyTurn ? 'Green rings: you can build there. Tap a city to select it.' : 'Tap a city for details.'}
+          {zoom === 1 ? ' Zoom in for names and costs.' : ''}
+        </p>
+      </Section>
+
+      {selected && (
+        <Section title={selected.name} right={<span className="text-xs capitalize text-slate-400">{selected.region.replace(/_/g, ' ')}</span>}>
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            {selected.houses.length === 0 ? 'No houses yet' : selected.houses.map((h, i) => (
+              <span key={i} className="flex items-center gap-1"><ColorDot color={h.playerColor} />{gameState.players.find((p) => p.id === h.playerId)?.name}</span>
             ))}
           </div>
-        </Card>
-      )}
-      
-      {/* Action Buttons */}
-      {isMyTurn && (
-        <Card className="p-6">
-          <div className="flex gap-3">
-            <Button
-              className="flex-1 touch-target"
-              onClick={handleBuildCity}
-              disabled={!selectedCity}
-            >
-              <Building2 className="w-5 h-5 mr-2" />
-              Build in {selectedCity?.name || 'Selected City'}
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="touch-target"
-              onClick={handlePass}
-            >
-              End Turn
-            </Button>
-          </div>
-          
-          {selectedCity && (
-            <div className="mt-4 p-3 bg-game-surface rounded-lg">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">House Cost:</span>
-                <span className="text-white">${10 + (selectedCity.houses.length * 5)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm mt-1">
-                <span className="text-slate-400">Connection Cost:</span>
-                <span className="text-white">
-                  ${calculateBuildingCost(selectedCity) - (10 + (selectedCity.houses.length * 5))}
-                </span>
-              </div>
-              <div className="border-t border-slate-600 mt-2 pt-2 flex items-center justify-between">
-                <span className="text-slate-400 font-medium">Total:</span>
-                <span className="text-green-400 font-bold">${calculateBuildingCost(selectedCity)}</span>
-              </div>
-            </div>
+          {selectedCheck && (
+            <p className={cn('mt-2 text-sm', selectedCheck.ok ? 'text-green-400' : 'text-red-400')}>
+              {selectedCheck.ok
+                ? `House $${selectedCheck.houseCost} + connection $${selectedCheck.connection} = $${selectedCheck.cost}`
+                : selectedCheck.reason}
+            </p>
           )}
-        </Card>
+        </Section>
       )}
-      
-      {!isMyTurn && (
-        <Card className="p-4">
-          <div className="text-center text-slate-400">
-            <p>Waiting for other players...</p>
-            {buildingPhaseState.currentBuilder && (
-              <p className="mt-2">
-                Current builder: {buildingPhaseState.currentBuilder}
-              </p>
-            )}
-          </div>
-        </Card>
+
+      <Section
+        title={showAll ? 'All cities' : 'You can build in'}
+        right={<button className="text-sm text-blue-400" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Only buildable' : 'Show all'}</button>}
+      >
+        {rows.length === 0 ? (
+          <p className="text-sm text-slate-400">{me.money < 10 ? 'Not enough money to build.' : 'Nowhere to build right now.'}</p>
+        ) : (
+          <ul className="divide-y divide-slate-700">
+            {rows.map(({ city, check }) => (
+              <li key={city.id}>
+                <button
+                  data-testid="city-item"
+                  onClick={() => select(city)}
+                  className={cn('flex min-h-[48px] w-full items-center gap-3 px-1 py-2 text-left', city.id === selectedId && 'bg-blue-500/15')}
+                >
+                  <MapPin className={cn('h-4 w-4 shrink-0', check.ok ? 'text-green-400' : 'text-slate-500')} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-white">{city.name}</span>
+                    <span className="block text-xs text-slate-400">{check.ok ? `${city.houses.length}/3 houses` : check.reason}</span>
+                  </span>
+                  <span className="flex gap-1">{city.houses.map((h, i) => <ColorDot key={i} color={h.playerColor} />)}</span>
+                  {check.ok && <span className="w-12 text-right font-semibold tabular-nums text-yellow-400">${check.cost}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      {mine.length > 0 && (
+        <Section title={`Your network (${mine.length})`}>
+          <p className="text-sm text-slate-300">{mine.map((c) => c.name).join(', ')}</p>
+        </Section>
       )}
-      
-      {/* Building History */}
-      {Object.keys(buildingPhaseState.citiesBuilt).length > 0 && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">
-            Cities Built This Turn
-          </h3>
-          
-          <div className="space-y-2">
-            {Object.entries(buildingPhaseState.citiesBuilt).map(([builderId, cityIds]) => {
-              if (cityIds.length === 0) return null;
-              
-              return (
-                <div key={builderId} className="p-3 bg-game-surface rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white">
-                      {builderId === playerId ? 'You' : `Player ${builderId}`}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400">{cityIds.length} cities</span>
-                      <Check className="w-4 h-4 text-green-400" />
-                    </div>
-                  </div>
-                  <div className="mt-1 text-xs text-slate-400">
-                    {cityIds.map(id => cities.find(c => c.id === id)?.name).join(', ')}
-                  </div>
-                </div>
-              );
-            })}
+
+      {isMyTurn && (
+        <ActionBar>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={build} disabled={!selectedCheck?.ok}>
+              <Building2 className="mr-2 h-5 w-5" />
+              {selected ? (selectedCheck?.ok ? `Build ${selected.name} $${selectedCheck.cost}` : `Can't build ${selected.name}`) : 'Select a city'}
+            </Button>
+            <Button variant="outline" onClick={() => { setSelectedId(null); endTurn(); }}>Done</Button>
           </div>
-        </Card>
+        </ActionBar>
       )}
     </div>
   );

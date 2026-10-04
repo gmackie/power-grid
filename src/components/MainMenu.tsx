@@ -9,7 +9,6 @@ import { Logo } from './ui/Art';
 const MainMenu: React.FC = () => {
   const { 
     connectionStatus, 
-    createGame, 
     joinGame, 
     connect, 
     disconnect,
@@ -21,10 +20,21 @@ const MainMenu: React.FC = () => {
   
   const { isMobile, isTablet, orientation } = useDeviceStore();
   
-  const [playerName, setPlayerName] = useState('');
-  const [gameId, setGameId] = useState('');
+  // Invite links look like /join/K7M4RX (or ?join=K7M4RX); read once before App rewrites the URL.
+  const [inviteCode] = useState(() => {
+    const m = window.location.pathname.match(/^\/join\/([A-Za-z0-9-]+)/);
+    return (m?.[1] ?? new URLSearchParams(window.location.search).get('join') ?? '').toUpperCase();
+  });
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem('powerGridPlayerName') ?? '');
+  const [gameId, setGameId] = useState(inviteCode);
   const [selectedColor, setSelectedColor] = useState('#ff0000');
-  const [showJoinForm, setShowJoinForm] = useState(false);
+  const [showJoinForm, setShowJoinForm] = useState(inviteCode !== '');
+  const [joinPassword, setJoinPassword] = useState('');
+  const errorMessage = useGameStore((s) => s.errorMessage);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  React.useEffect(() => {
+    if (errorMessage === 'Incorrect password') setNeedsPassword(true);
+  }, [errorMessage]);
 
   const colors = [
     { value: '#ff0000', name: 'Red' },
@@ -38,7 +48,7 @@ const MainMenu: React.FC = () => {
 
   const handleJoinGame = () => {
     if (playerName.trim() && gameId.trim()) {
-      joinGame(gameId.trim(), playerName.trim(), selectedColor);
+      joinGame(gameId.trim(), playerName.trim(), selectedColor, joinPassword || undefined);
     }
   };
 
@@ -188,17 +198,35 @@ const MainMenu: React.FC = () => {
                   disabled={connectionStatus !== 'connected'}
                 >
                   <Users className="w-5 h-5 mr-2" />
-                  Join Game by ID
+                  Join with Lobby Code
                 </Button>
               </>
             ) : (
               <div className="space-y-3">
                 <Input
-                  label="Game ID"
-                  placeholder="Enter game ID"
+                  label="Lobby code"
+                  placeholder="e.g. K7M4RX"
                   value={gameId}
                   onChange={(e) => setGameId(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleJoinGame(); }}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  enterKeyHint="go"
+                  className="uppercase tracking-widest"
                 />
+                {needsPassword && (
+                  <Input
+                    label="Lobby password"
+                    type="password"
+                    value={joinPassword}
+                    onChange={(e) => setJoinPassword(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleJoinGame(); }}
+                    enterKeyHint="go"
+                    autoFocus
+                  />
+                )}
                 
                 <div className="flex gap-2">
                   <Button

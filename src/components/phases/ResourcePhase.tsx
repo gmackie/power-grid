@@ -1,335 +1,134 @@
-import React, { useState } from 'react';
-import { useGameStore, useDeviceStore } from '../../store/gameStore';
-import type { ResourceType, ResourcePhaseState, ResourceMarket } from '../../types/game';
-import { Fuel, Minus, Plus, ShoppingCart, Check } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ShoppingCart } from 'lucide-react';
+import { useGameStore } from '../../store/gameStore';
 import Button from '../ui/Button';
-import Card from '../ui/Card';
-import useGameActions from '../../hooks/useGameActions';
 import { ResourceIcon } from '../ui/Art';
+import { ActionBar, PlantSummary, Section, Stepper } from '../game/GameChrome';
+import { useGameView } from '../../hooks/useGameView';
+import {
+  FUELS, type Fuel, fitsStorage, nextPrice, playerStore, purchaseCost, storageCapacity, tokensAvailable, usableFuels,
+} from '../../utils/rules';
 
-interface ResourcePhaseProps {
-  resourcePhaseState: ResourcePhaseState;
-  resourceMarket: ResourceMarket;
-  localMode?: boolean;
+const EMPTY: Record<Fuel, number> = { coal: 0, oil: 0, garbage: 0, uranium: 0 };
+
+/** Price ladder as small chips: "$3×2 $4×3 …". */
+function Ladder({ ladder }: { ladder: number[] }) {
+  const rungs = ladder.map((n, price) => ({ n, price })).filter((r) => r.price > 0 && r.n > 0);
+  if (rungs.length === 0) return <span className="text-xs text-red-400">Sold out</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {rungs.map((r) => (
+        <span key={r.price} className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] tabular-nums text-slate-300">
+          ${r.price}×{r.n}
+        </span>
+      ))}
+    </div>
+  );
 }
 
-const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resourceMarket, localMode = false }) => {
-  const { 
-    getCurrentPlayer, 
-    isCurrentPlayerTurn,
-    playerId
-  } = useGameStore();
-  
-  const { buyResources, endTurn } = useGameActions(localMode);
-  
-  const { isMobile } = useDeviceStore();
-  
-  const [resourcesToBuy, setResourcesToBuy] = useState<Record<ResourceType, number>>({
-    coal: 0,
-    oil: 0,
-    garbage: 0,
-    uranium: 0,
-    hybrid: 0,
-    eco: 0
-  });
-  
-  const currentPlayer = getCurrentPlayer();
-  const isMyTurn = isCurrentPlayerTurn();
-  const myPurchases = resourcePhaseState.resourcesPurchased[playerId || ''] || {};
-  
-  // Calculate resource capacities based on power plants
-  const getResourceCapacity = (type: ResourceType): number => {
-    if (!currentPlayer) return 0;
-    
-    return currentPlayer.powerPlants.reduce((capacity, plant) => {
-      if (plant.resourceType === type || plant.resourceType === 'hybrid') {
-        return capacity + plant.resourceCount * 2; // Plants can store 2x their requirement
-      }
-      return capacity;
-    }, 0);
-  };
-  
-  // Calculate current resources including purchases
-  const getCurrentResources = (type: ResourceType): number => {
-    if (!currentPlayer) return 0;
-    return currentPlayer.resources[type] + (myPurchases[type] || 0);
-  };
-  
-  // Calculate price for buying resources
-  const getResourcePrice = (type: ResourceType, amount: number): number => {
-    const prices: Record<ResourceType, number> = {
-      coal: resourceMarket.coalPrice,
-      oil: resourceMarket.oilPrice,
-      garbage: resourceMarket.garbagePrice,
-      uranium: resourceMarket.uraniumPrice,
-      hybrid: resourceMarket.hybridPrice || 0,
-      eco: resourceMarket.ecoPrice || 0
-    };
-    
-    // Simple pricing: fixed price per unit (in real game, prices increase as supply decreases)
-    return prices[type] * amount;
-  };
-  
-  const getTotalCost = (): number => {
-    return Object.entries(resourcesToBuy).reduce((total, [type, amount]) => {
-      return total + getResourcePrice(type as ResourceType, amount);
-    }, 0);
-  };
-  
-  const canAffordPurchase = (): boolean => {
-    if (!currentPlayer) return false;
-    return getTotalCost() <= currentPlayer.money;
-  };
-  
-  const handleResourceChange = (type: ResourceType, delta: number) => {
-    const currentAmount = resourcesToBuy[type];
-    const newAmount = Math.max(0, currentAmount + delta);
-    const currentResources = getCurrentResources(type);
-    const capacity = getResourceCapacity(type);
-    const maxCanBuy = capacity - currentResources;
-    const available = resourceMarket[type as keyof typeof resourceMarket];
-    
-    // Check constraints
-    if (newAmount > maxCanBuy) return; // Can't exceed capacity
-    if (newAmount > available) return; // Can't exceed market supply
-    
-    setResourcesToBuy({
-      ...resourcesToBuy,
-      [type]: newAmount
-    });
-  };
-  
-  const handleBuyResources = () => {
-    const hasResources = Object.values(resourcesToBuy).some(amount => amount > 0);
-    if (hasResources && canAffordPurchase()) {
-      buyResources(resourcesToBuy);
-      setResourcesToBuy({ coal: 0, oil: 0, garbage: 0, uranium: 0, hybrid: 0, eco: 0 });
+const ResourcePhase: React.FC = () => {
+  const { gameState, me, isMyTurn } = useGameView();
+  const buyResources = useGameStore((s) => s.buyResources);
+  const endTurn = useGameStore((s) => s.endTurn);
+  const [cart, setCart] = useState<Record<Fuel, number>>(EMPTY);
+
+  const ladders = gameState?.resourceLadders;
+  const plants = me?.powerPlants ?? [];
+  const owned = me ? playerStore(me) : EMPTY;
+  const usable = usableFuels(plants);
+  const cap = storageCapacity(plants);
+
+  // A new turn or a market change invalidates the cart.
+  const ladderKey = JSON.stringify(ladders);
+  useEffect(() => { setCart(EMPTY); }, [isMyTurn, ladderKey]);
+
+  const costOf = (f: Fuel, n: number) => purchaseCost(ladders?.[f], n);
+  const total = useMemo(
+    () => FUELS.reduce((sum, f) => sum + (costOf(f, cart[f]) ?? Infinity), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cart, ladderKey]
+  );
+
+  /** Most of `fuel` we could add given storage, supply and money. */
+  const maxFor = (f: Fuel): number => {
+    let n = cart[f];
+    for (;;) {
+      const next = { ...cart, [f]: n + 1 };
+      const after = FUELS.reduce((acc, x) => ({ ...acc, [x]: owned[x] + next[x] }), {} as Record<Fuel, number>);
+      const cost = FUELS.reduce((sum, x) => sum + (costOf(x, next[x]) ?? Infinity), 0);
+      if (!fitsStorage(plants, after) || cost > (me?.money ?? 0)) return n;
+      n += 1;
     }
   };
-  
-  const handlePass = () => {
+
+  if (!gameState || !me) return null;
+
+  const nothing = FUELS.every((f) => cart[f] === 0);
+  const buyAndEnd = () => {
+    if (!nothing) buyResources({ ...cart, hybrid: 0, eco: 0 });
     endTurn();
-    setResourcesToBuy({ coal: 0, oil: 0, garbage: 0, uranium: 0, hybrid: 0, eco: 0 });
+    setCart(EMPTY);
   };
-  
-  const renderResourceRow = (type: ResourceType, icon: string, color: string) => {
-    const capacity = getResourceCapacity(type);
-    const current = getCurrentResources(type);
-    const toBuy = resourcesToBuy[type];
-    const available = resourceMarket[type as keyof typeof resourceMarket];
-    const price = getResourcePrice(type, 1);
-    
-    if (capacity === 0) return null; // Don't show resources player can't use
-    
-    return (
-      <div key={type} className="p-4 bg-game-surface rounded-lg">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 ${color} rounded-full flex items-center justify-center text-white`} title={icon}>
-              <ResourceIcon type={type} size={28} />
-            </div>
-            <div>
-              <h4 className="text-white font-medium capitalize">{type}</h4>
-              <p className="text-xs text-slate-400">${price} each</p>
-            </div>
-          </div>
-          
-          <div className="text-right">
-            <p className="text-sm text-slate-400">Available</p>
-            <p className="text-lg font-semibold text-white">{available}</p>
-          </div>
-        </div>
-        
-        {/* Resource capacity bar */}
-        <div className="mb-3">
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Storage: {current + toBuy}/{capacity}</span>
-            <span>{Math.round(((current + toBuy) / capacity) * 100)}%</span>
-          </div>
-          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-            <div className="h-full flex">
-              <div 
-                className={`${color} transition-all duration-300`}
-                style={{ width: `${(current / capacity) * 100}%` }}
-              />
-              <div 
-                className={`${color} opacity-50 transition-all duration-300`}
-                style={{ width: `${(toBuy / capacity) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
-        
-        {/* Buy controls */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleResourceChange(type, -1)}
-            disabled={toBuy === 0 || !isMyTurn}
-            className="w-10 h-10 p-0"
-          >
-            <Minus className="w-4 h-4" />
-          </Button>
-          
-          <div className="text-center">
-            <p className="text-2xl font-bold text-white">{toBuy}</p>
-            {toBuy > 0 && (
-              <p className="text-sm text-yellow-400">${getResourcePrice(type, toBuy)}</p>
-            )}
-          </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleResourceChange(type, 1)}
-            disabled={
-              !isMyTurn ||
-              toBuy >= available ||
-              current + toBuy >= capacity
-            }
-            className="w-10 h-10 p-0"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-  
+
   return (
-    <div className="space-y-6">
-      {/* Phase Header */}
-      <Card className="p-4 bg-green-900/20 border-green-600">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Fuel className="w-6 h-6 text-green-400" />
-            <div>
-              <h2 className="text-xl font-bold text-white">Resource Phase</h2>
-              <p className="text-sm text-slate-400">
-                Buy resources to power your plants
-              </p>
-            </div>
+    <div className="space-y-3">
+      {plants.length > 0 && (
+        <Section title="Your plants">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {plants.map((p) => <PlantSummary key={p.id} plant={p} />)}
           </div>
-          
-          <div className="text-right">
-            <p className="text-sm text-slate-400">Turn Order</p>
-            <p className="text-lg font-semibold text-white">
-              {resourcePhaseState.buyingOrder.indexOf(playerId || '') + 1} / {resourcePhaseState.buyingOrder.length}
-            </p>
-          </div>
-        </div>
-      </Card>
-      
-      {/* Player Status */}
-      {currentPlayer && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-400">Your Money</p>
-              <p className="text-2xl font-bold text-yellow-400">${currentPlayer.money}</p>
-            </div>
-            
-            {getTotalCost() > 0 && (
-              <div className="text-right">
-                <p className="text-sm text-slate-400">Total Cost</p>
-                <p className={`text-2xl font-bold ${
-                  canAffordPurchase() ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  ${getTotalCost()}
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
+        </Section>
       )}
-      
-      {/* Resource Market */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">
-          Resource Market
-        </h3>
-        
-        <div className={`
-          grid gap-4
-          ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}
-        `}>
-          {renderResourceRow('coal', '⚫', 'bg-gray-700')}
-          {renderResourceRow('oil', '🛢️', 'bg-amber-700')}
-          {renderResourceRow('garbage', '🗑️', 'bg-yellow-700')}
-          {renderResourceRow('uranium', '☢️', 'bg-green-700')}
-        </div>
-      </Card>
-      
-      {/* Action Buttons */}
-      {isMyTurn && (
-        <Card className="p-6">
-          <div className="flex gap-3">
-            <Button
-              className="flex-1 touch-target"
-              onClick={handleBuyResources}
-              disabled={getTotalCost() === 0 || !canAffordPurchase()}
-            >
-              <ShoppingCart className="w-5 h-5 mr-2" />
-              Buy Resources (${getTotalCost()})
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="touch-target"
-              onClick={handlePass}
-            >
-              End Turn
-            </Button>
-          </div>
-        </Card>
-      )}
-      
-      {!isMyTurn && (
-        <Card className="p-4">
-          <div className="text-center text-slate-400">
-            <p>Waiting for other players...</p>
-            {resourcePhaseState.currentBuyer && (
-              <p className="mt-2">
-                Current buyer: {resourcePhaseState.currentBuyer}
-              </p>
-            )}
-          </div>
-        </Card>
-      )}
-      
-      {/* Purchase History */}
-      {Object.keys(resourcePhaseState.resourcesPurchased).length > 0 && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">
-            Resources Purchased
-          </h3>
-          
-          <div className="space-y-2">
-            {Object.entries(resourcePhaseState.resourcesPurchased).map(([buyerId, resources]) => {
-              const hasResources = Object.values(resources).some(amount => amount > 0);
-              if (!hasResources) return null;
-              
-              return (
-                <div key={buyerId} className="flex items-center justify-between p-3 bg-game-surface rounded-lg">
-                  <span className="text-white">
-                    {buyerId === playerId ? 'You' : `Player ${buyerId}`}
-                  </span>
-                  <div className="flex items-center gap-3">
-                    {Object.entries(resources).map(([type, amount]) => 
-                      amount > 0 && (
-                        <span key={type} className="text-sm text-slate-400">
-                          {amount}× {type}
-                        </span>
-                      )
-                    )}
-                    <Check className="w-4 h-4 text-green-400" />
+
+      <Section title="Resource market" right={isMyTurn ? <span className="text-xs text-slate-400">Cheapest first</span> : undefined}>
+        <div className="space-y-2">
+          {FUELS.map((f) => {
+            const canUse = usable.includes(f);
+            const storage = cap.own[f] + (f === 'coal' || f === 'oil' ? cap.hybrid : 0);
+            const lineCost = costOf(f, cart[f]);
+            return (
+              <div key={f} className="rounded-lg bg-game-surface p-3">
+                <div className="flex items-center gap-3">
+                  <ResourceIcon type={f} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="font-medium capitalize text-white">{f}</p>
+                      <p className="text-xs text-slate-400">
+                        {tokensAvailable(ladders?.[f])} left · next ${nextPrice(ladders?.[f]) ?? '–'}
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      {canUse ? `You hold ${owned[f]} / ${storage}` : `You hold ${owned[f]} · no plant uses ${f}`}
+                    </p>
                   </div>
                 </div>
-              );
-            })}
+                <div className="mt-2"><Ladder ladder={ladders?.[f] ?? []} /></div>
+                {isMyTurn && canUse && (
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-sm tabular-nums text-yellow-400">{cart[f] > 0 ? `$${lineCost ?? '–'}` : ''}</span>
+                    <Stepper label={f} value={cart[f]} max={maxFor(f)} onChange={(v) => setCart({ ...cart, [f]: Math.max(0, v) })} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      {isMyTurn && (
+        <ActionBar>
+          <div className="flex items-center justify-between text-sm short:hidden">
+            <span className="text-slate-400">{nothing ? 'Nothing in cart' : `Cart: ${FUELS.filter((f) => cart[f]).map((f) => `${cart[f]} ${f}`).join(', ')}`}</span>
+            <span className="font-bold tabular-nums text-yellow-400">${nothing ? 0 : total} / ${me.money}</span>
           </div>
-        </Card>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={buyAndEnd} disabled={!nothing && total > me.money}>
+              <ShoppingCart className="mr-2 h-5 w-5" />
+              {nothing ? 'Buy nothing & end turn' : `Buy for $${total} & end turn`}
+            </Button>
+            {!nothing && <Button variant="outline" onClick={() => setCart(EMPTY)}>Clear</Button>}
+          </div>
+        </ActionBar>
       )}
     </div>
   );

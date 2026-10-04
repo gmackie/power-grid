@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     
     <!-- App Info -->
     <title>Power Grid Digital</title>
@@ -16,7 +16,7 @@
     <!-- Icons -->
     <link rel="icon" type="image/png" href="/icons/icon-32x32.png" sizes="32x32" />
     <link rel="icon" type="image/png" href="/icons/icon-16x16.png" sizes="16x16" />
-    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     
     <!-- iOS PWA Support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -26,29 +26,21 @@
     
     <!-- Android PWA Support -->
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#0f172a" />
     <meta name="background-color" content="#0f172a" />
     
     <!-- Windows PWA Support -->
     <meta name="msapplication-TileColor" content="#2563eb" />
     <meta name="msapplication-TileImage" content="/icons/icon-192x192.png" />
-    <meta name="msapplication-config" content="/browserconfig.xml" />
-    
-    <!-- Performance -->
-    <link rel="preconnect" href="ws://localhost:4080" />
-    <link rel="dns-prefetch" href="//localhost:4080" />
     
     <!-- Security -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
     
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Power Grid Digital" />
     <meta property="og:description" content="A digital adaptation of the Power Grid board game with cross-platform multiplayer support" />
     <meta property="og:image" content="/icons/icon-512x512.png" />
-    <meta property="og:url" content="https://your-domain.com" />
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -69,6 +61,7 @@
       
       #root {
         min-height: 100vh;
+        min-height: 100dvh;
       }
       
       /* Loading spinner */
@@ -115,15 +108,15 @@
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered: ', registration);
-            })
-            .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
-            });
-        });
+        const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+        if (isLocal) {
+          // Dev server: never serve stale modules from a previously installed worker.
+          navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch((err) => console.log('SW registration failed: ', err));
+          });
+        }
       }
       
       // PWA Install Prompt

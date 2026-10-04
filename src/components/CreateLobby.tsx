@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, Users, Map, Lock, Play } from 'lucide-react';
+import { ArrowLeft, Users, Map, Play } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import Input from './ui/Input';
@@ -19,41 +19,43 @@ const CreateLobby: React.FC = () => {
   const [password, setPassword] = useState('');
   const [usePassword, setUsePassword] = useState(false);
   const [creating, setCreating] = useState(false);
+  const errorMessage = useGameStore((s) => s.errorMessage);
+  const setError = useGameStore((s) => s.setError);
 
-  const [availableMaps, setAvailableMaps] = useState<Array<{id:string; name:string; description:string}>>([]);
-  const [mapError, setMapError] = useState('');
+  // Any server error ends the attempt; so does silence (LOBBY_CREATED switches screens on success).
   useEffect(() => {
-    const controller = new AbortController();
-    fetch('/maps', {signal: controller.signal})
-      .then(response => {
-        if (!response.ok) throw new Error('Unable to load maps');
-        return response.json();
-      })
-      .then(data => setAvailableMaps(data.maps))
-      .catch(error => { if (error.name !== 'AbortError') setMapError('Unable to load maps. Please try again.'); });
-    return () => controller.abort();
-  }, []);
+    if (creating && errorMessage) setCreating(false);
+  }, [creating, errorMessage]);
+  useEffect(() => {
+    if (!creating) return;
+    const timer = setTimeout(() => {
+      setCreating(false);
+      setError('The server did not respond. Please try again.');
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [creating, setError]);
+
+  const serverMaps = useGameStore((s) => s.availableMaps);
+  const requestMaps = useGameStore((s) => s.requestMaps);
+  useEffect(() => { requestMaps(); }, [requestMaps]);
+  const availableMaps = serverMaps.length > 0
+    ? serverMaps.map((m) => ({ id: m.id, name: m.name, description: `${m.description} (${m.cityCount} cities, ${m.playerCount.min}-${m.playerCount.max} players)` }))
+    : [
+        { id: 'usa', name: 'USA', description: 'The original Power Grid map' },
+        { id: 'germany', name: 'Germany', description: 'European variant with different regions' }
+      ];
 
   const playerCounts = [2, 3, 4, 5, 6];
 
   const handleCreateLobby = async () => {
-    if (!lobbyName.trim() || creating || !availableMaps.some(map => map.id === selectedMap)) return;
+    if (!lobbyName.trim() || creating) return;
     
-    setCreating(true);
-    
-    try {
-      createLobby(
-        lobbyName.trim(),
-        maxPlayers,
-        selectedMap,
-        usePassword ? password : undefined
-      );
-    } catch (error) {
-      console.error('Failed to create lobby:', error);
-      setCreating(false);
-    }
-    
-    // Note: setCreating(false) will be handled by the store when we receive the lobby created response
+    setCreating(createLobby(
+      lobbyName.trim(),
+      maxPlayers,
+      selectedMap,
+      usePassword ? password : undefined
+    ));
   };
 
   const handleBack = () => {
@@ -128,7 +130,6 @@ const CreateLobby: React.FC = () => {
               Game Map
             </label>
             <div className="space-y-2">
-              {mapError && <p role="alert" className="text-red-400">{mapError}</p>}
               {availableMaps.map((map) => (
                 <button
                   key={map.id}

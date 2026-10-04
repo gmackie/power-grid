@@ -1,187 +1,59 @@
 // Service Worker for Power Grid Digital PWA
+//
+// Pages are network-first so a deploy reaches phones on the next load; only
+// content-hashed bundles and art are served cache-first.
 
-const CACHE_NAME = 'power-grid-v2.0.0';
-const API_CACHE_NAME = 'power-grid-api-v2.0.0';
+const CACHE_NAME = 'power-grid-v2';
 
-// Files to cache for offline functionality
-const STATIC_CACHE_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  // Add other static assets as needed
-];
-
-// API endpoints to cache (with network-first strategy)
-const API_CACHE_URLS = [
-  '/api/health',
-  // Add other API endpoints as needed
-];
-
-// Install event - cache static assets
-self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...');
-  
-  event.waitUntil(
-    Promise.all([
-      caches.open(CACHE_NAME).then((cache) => {
-        console.log('Caching static assets');
-        return cache.addAll(STATIC_CACHE_URLS);
-      }),
-      caches.open(API_CACHE_NAME)
-    ])
-  );
-  
-  // Force the service worker to become active immediately
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// Activate event - cleanup old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker activating...');
-  
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== API_CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys()
+      .then((names) => Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))))
+      .then(() => self.clients.claim())
   );
-  
-  // Take control of all pages immediately
-  self.clients.claim();
 });
 
-// Fetch event - handle network requests
+const isImmutable = (url) => url.pathname.startsWith('/assets/') || url.pathname.startsWith('/art/');
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  
-  // Handle WebSocket connections (don't cache)
-  if (url.protocol === 'ws:' || url.protocol === 'wss:') {
-    return;
-  }
-  
-  // Never cache live game data, authenticated responses, or mutations.
-  if (request.method !== 'GET' || /^\/(api|admin|maps|health|ready|docs|openapi\.json|ws|game)(\/|$)/.test(url.pathname)) return;
+  // Same-origin static files only; API, WebSocket upgrades and dev-server modules go straight to the network.
+  if (url.origin !== self.location.origin) return;
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirstStrategy(request, CACHE_NAME));
-    return;
+    event.respondWith(networkFirst(request));
+  } else if (isImmutable(url)) {
+    event.respondWith(cacheFirst(request));
   }
-
-  // Handle static assets with cache-first strategy
-  event.respondWith(cacheFirstStrategy(request, CACHE_NAME));
 });
 
-// Cache-first strategy for static assets
-async function cacheFirstStrategy(request, cacheName) {
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok) {
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(request, response.clone());
+  }
+  return response;
+}
+
+async function networkFirst(request) {
   try {
-    // Try to get from cache first
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
-      return cachedResponse;
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put('/index.html', response.clone());
     }
-    
-    // If not in cache, fetch from network
-    const networkResponse = await fetch(request);
-    
-    // Cache successful responses
-    if (networkResponse.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
+    return response;
   } catch (error) {
-    console.error('Cache-first strategy failed:', error);
-    
-    // Return a fallback response for navigation requests
-    if (request.mode === 'navigate') {
-      return caches.match('/index.html');
-    }
-    
+    const cached = await caches.match('/index.html');
+    if (cached) return cached;
     throw error;
   }
 }
-
-// Network-first strategy for API requests
-async function networkFirstStrategy(request, cacheName) {
-  try {
-    // Try network first
-    const networkResponse = await fetch(request);
-    
-    // Cache successful responses
-    if (networkResponse.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
-  } catch (error) {
-    console.log('Network request failed, trying cache:', error);
-    
-    // Fall back to cache
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
-      return cachedResponse;
-    }
-    
-    throw error;
-  }
-}
-
-// Background sync for when connection is restored
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'background-sync') {
-    event.waitUntil(handleBackgroundSync());
-  }
-});
-
-async function handleBackgroundSync() {
-  console.log('Background sync triggered');
-  // Handle any queued actions when connection is restored
-  // This could include sending cached game moves, etc.
-}
-
-// Push notifications (for future use)
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
-  
-  const data = event.data.json();
-  const options = {
-    body: data.body,
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    tag: 'power-grid-notification',
-    requireInteraction: true,
-    actions: [
-      {
-        action: 'view',
-        title: 'View Game'
-      },
-      {
-        action: 'dismiss',
-        title: 'Dismiss'
-      }
-    ]
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
-});
-
-// Handle notification clicks
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  
-  if (event.action === 'view') {
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  }
-});

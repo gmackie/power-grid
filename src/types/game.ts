@@ -39,6 +39,10 @@ export interface Player {
     hybrid: number;
     eco: number;
   };
+  /** Server: finished this phase (bought a plant / passed). */
+  hasPassed?: boolean;
+  poweredCities?: number;
+  connected?: boolean;
 }
 
 export interface PowerPlant {
@@ -68,6 +72,7 @@ export interface Connection {
 export interface House {
   playerColor: string;
   cost: number;
+  playerId?: string;
 }
 
 export interface ResourceMarket {
@@ -110,7 +115,11 @@ export interface GameState {
   futureMarket?: PowerPlant[];
   winnerId?: string | null;
   activeRegions?: string[];
+  mapId?: string;
   serverPhase?: string;
+  /** Market tokens by price: ladder[price] = count (index 0 unused). */
+  resourceLadders?: Record<'coal' | 'oil' | 'garbage' | 'uranium', number[]>;
+  deckRemaining?: number;
 }
 
 export interface AuctionState {
@@ -120,6 +129,7 @@ export interface AuctionState {
   biddingOrder: string[];
   passedPlayers: string[];
   plantsWon: Record<string, PowerPlant>;
+  nominatedBy?: string;
 }
 
 export interface ResourcePhaseState {
@@ -187,6 +197,9 @@ export interface AppState {
   playerId?: string;
   playerName?: string;
   errorMessage?: string;
+  /** Our id inside the current game (survives lobby-session expiry). */
+  gamePlayerId?: string;
+  gameConnection?: 'disconnected' | 'connecting' | 'connected' | 'error';
 }
 
 // Lobby Types

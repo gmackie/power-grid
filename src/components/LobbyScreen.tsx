@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { Users, Play, ArrowLeft, Copy, Check, Crown, Settings } from 'lucide-react';
+import { Users, Play, ArrowLeft, Copy, Check, Crown } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import { lobbyActions } from '../services/websocket';
@@ -17,7 +17,6 @@ const LobbyScreen: React.FC = () => {
   } = useGameStore();
 
   const [gameIdCopied, setGameIdCopied] = React.useState(false);
-  const [isReady, setIsReady] = React.useState(false);
 
   // Redirect if no lobby
   useEffect(() => {
@@ -37,13 +36,24 @@ const LobbyScreen: React.FC = () => {
   const currentPlayer = currentLobby.players.find(p => (playerId ? p.id === playerId : p.name === playerName));
   const isHost = currentPlayer?.is_host || false;
 
+  const inviteUrl = `${window.location.origin}/join/${currentLobby.id}`;
+  const canShare = typeof navigator.share === 'function';
+
   const handleCopyGameId = async () => {
+    if (canShare) {
+      try {
+        await navigator.share({ title: 'Power Grid', text: `Join my Power Grid game: ${currentLobby.id}`, url: inviteUrl });
+        return;
+      } catch (error) {
+        if ((error as DOMException).name === 'AbortError') return;
+      }
+    }
     try {
-      await navigator.clipboard.writeText(currentLobby.id);
+      await navigator.clipboard.writeText(inviteUrl);
       setGameIdCopied(true);
       setTimeout(() => setGameIdCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy game ID:', error);
+      console.error('Failed to copy invite link:', error);
     }
   };
 
@@ -57,11 +67,8 @@ const LobbyScreen: React.FC = () => {
     leaveLobby();
   };
   
-  const handleToggleReady = () => {
-    const newReadyState = !isReady;
-    setIsReady(newReadyState);
-    setReady(newReadyState);
-  };
+  const isReady = currentPlayer?.ready ?? false;
+  const handleToggleReady = () => setReady(!isReady);
 
   return (
     <div className="min-h-screen bg-game-background p-4">
@@ -88,7 +95,7 @@ const LobbyScreen: React.FC = () => {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">
-              Game ID
+              Lobby code
             </h2>
             
             <Button
@@ -102,7 +109,7 @@ const LobbyScreen: React.FC = () => {
               ) : (
                 <Copy className="w-4 h-4 mr-2" />
               )}
-              {gameIdCopied ? 'Copied!' : 'Copy'}
+              {gameIdCopied ? 'Link copied!' : canShare ? 'Share invite' : 'Copy invite link'}
             </Button>
           </div>
           
@@ -111,7 +118,7 @@ const LobbyScreen: React.FC = () => {
               {currentLobby.id}
             </div>
             <p className="text-slate-400 text-sm mt-2">
-              Share this ID with friends to let them join
+              Send the invite link, or have friends enter this code under "Join with Lobby Code"
             </p>
           </div>
         </Card>
@@ -226,7 +233,7 @@ const LobbyScreen: React.FC = () => {
                 onClick={handleToggleReady}
                 disabled={connectionStatus !== 'connected'}
               >
-                {isReady ? 'Ready ✓' : 'Not Ready'}
+                {isReady ? 'Ready ✓ (tap to undo)' : "I'm ready"}
               </Button>
             </div>
           </Card>

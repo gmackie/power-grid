@@ -5,9 +5,12 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#2563eb",
+  "theme_color": "#0f172a",
   "orientation": "any",
-  "categories": ["games", "entertainment"],
+  "categories": [
+    "games",
+    "entertainment"
+  ],
   "lang": "en",
   "dir": "ltr",
   "scope": "/",
@@ -19,14 +22,14 @@
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-96x96.png", 
+      "src": "/icons/icon-96x96.png",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-128x128.png",
-      "sizes": "128x128", 
+      "sizes": "128x128",
       "type": "image/png",
       "purpose": "any maskable"
     },
@@ -59,48 +62,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshots/desktop-1.png",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Power Grid main menu on desktop"
-    },
-    {
-      "src": "/screenshots/mobile-1.png", 
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Power Grid main menu on mobile"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "New Game",
-      "short_name": "New Game",
-      "description": "Start a new Power Grid game",
-      "url": "/?action=new-game",
-      "icons": [
-        {
-          "src": "/icons/shortcut-new-game.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "Join Game", 
-      "short_name": "Join Game",
-      "description": "Join an existing Power Grid game",
-      "url": "/?action=join-game",
-      "icons": [
-        {
-          "src": "/icons/shortcut-join-game.png",
-          "sizes": "96x96"
-        }
-      ]
     }
   ],
   "prefer_related_applications": false

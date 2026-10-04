@@ -17,6 +17,7 @@ function App() {
   useEffect(() => {
     // Initialize device info
     updateDeviceInfo();
+    useGameStore.getState().resumeGame();
 
     // Auto-connect to server on app start
     if (connectionStatus === 'disconnected') {
@@ -30,10 +31,14 @@ function App() {
         console.log('App backgrounded');
       } else {
         // App came to foreground - resume
-        console.log('App foregrounded');
-        if (connectionStatus === 'disconnected') {
+        // Phones suspend background tabs: reconnect, or refresh our session if the socket survived.
+        const { connectionStatus: status, playerName, registerPlayer } = useGameStore.getState();
+        if (status === 'disconnected' || status === 'error') {
           connect().catch(console.error);
+        } else if (status === 'connected' && playerName) {
+          registerPlayer(playerName);
         }
+        useGameStore.getState().resumeGame();
       }
     };
 
