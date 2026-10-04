@@ -3,7 +3,7 @@ import Card from '../ui/Card';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 import { adminApi } from '../../services/adminApi';
-import { PlayerSummary } from '@power-grid/api-client';
+import type { PlayerSummary } from '../../types/api-client';
 
 export const PlayerManagement: React.FC = () => {
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
@@ -110,13 +110,13 @@ export const PlayerManagement: React.FC = () => {
                         {player.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {player.games_played}
+                        {player.gamesPlayed}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {(player.win_rate * 100).toFixed(1)}%
+                        {(player.winRate * 100).toFixed(1)}%
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(player.last_active).toLocaleDateString()}
+                        {new Date(player.lastActive).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -163,7 +163,7 @@ export const PlayerManagement: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Total Games:</span>
-                    <span className="font-medium">{selectedPlayer.games_played}</span>
+                    <span className="font-medium">{selectedPlayer.gamesPlayed}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Wins:</span>
@@ -171,15 +171,15 @@ export const PlayerManagement: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Win Rate:</span>
-                    <span className="font-medium">{(selectedPlayer.win_rate * 100).toFixed(1)}%</span>
+                    <span className="font-medium">{(selectedPlayer.winRate * 100).toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Average Score:</span>
-                    <span className="font-medium">{selectedPlayer.average_score.toFixed(0)}</span>
+                    <span className="font-medium">{selectedPlayer.averageScore.toFixed(0)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Favorite Map:</span>
-                    <span className="font-medium">{selectedPlayer.favorite_map || 'N/A'}</span>
+                    <span className="font-medium">{selectedPlayer.favoriteMap || 'N/A'}</span>
                   </div>
                 </div>
               </div>

@@ -6,6 +6,7 @@ import Button from '../ui/Button';
 import Card from '../ui/Card';
 import Input from '../ui/Input';
 import useGameActions from '../../hooks/useGameActions';
+import { PlantCard } from '../ui/Art';
 
 interface AuctionPhaseProps {
   auctionState: AuctionState;
@@ -29,7 +30,8 @@ const AuctionPhase: React.FC<AuctionPhaseProps> = ({ auctionState, powerPlantMar
   const [selectedPlant, setSelectedPlant] = useState<PowerPlant | null>(null);
   
   const currentPlayer = getCurrentPlayer();
-  const isMyTurn = isCurrentPlayerTurn();
+  const isMyTurn = isCurrentPlayerTurn() &&
+    (!auctionState.currentPlant || auctionState.currentBidder === playerId);
   const hasPassedThisRound = auctionState.passedPlayers.includes(playerId || '');
   const currentAuctionPlant = auctionState.currentPlant;
   
@@ -109,15 +111,9 @@ const AuctionPhase: React.FC<AuctionPhaseProps> = ({ auctionState, powerPlantMar
         `}
         onClick={() => isAvailable && !isCurrentAuction && handleSelectPlant(plant)}
       >
-        {/* Plant Number */}
-        <div className="text-center mb-3">
-          <div className="text-3xl font-bold text-white">
-            {plant.number}
-          </div>
-          <div className="text-sm text-slate-400">
-            Min: ${plant.cost}
-          </div>
-        </div>
+        {/* Illustrated card */}
+        <PlantCard type={plant.resourceType} number={plant.number} className="w-full h-auto rounded-lg mb-2" width={undefined} height={undefined} />
+        <div className="text-center mb-2 text-sm text-slate-400">Min: ${plant.cost}</div>
 
         {/* Resource Type */}
         <div className={`

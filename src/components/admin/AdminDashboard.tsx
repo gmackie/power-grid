@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { adminApi } from '../../services/adminApi';
-import { ServerInfo, HealthStatus, GameAnalytics } from '@power-grid/api-client';
+import type { ServerInfo, HealthStatus, GameAnalytics } from '../../types/api-client';
 import { PlayerManagement } from './PlayerManagement';
 import { GameAnalyticsView } from './GameAnalyticsView';
 import { LeaderboardView } from './LeaderboardView';
@@ -56,7 +56,7 @@ export const AdminDashboard: React.FC = () => {
       ].map(section => (
         <Button
           key={section.id}
-          variant={activeSection === section.id ? 'primary' : 'secondary'}
+          variant={activeSection === section.id ? 'default' : 'secondary'}
           onClick={() => setActiveSection(section.id as AdminSection)}
         >
           {section.label}
@@ -105,16 +105,16 @@ export const AdminDashboard: React.FC = () => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>Total Games:</span>
-              <span className="font-semibold">{gameAnalytics?.total_games || 0}</span>
+              <span className="font-semibold">{gameAnalytics?.totalGames || 0}</span>
             </div>
             <div className="flex justify-between">
               <span>Unique Players:</span>
-              <span className="font-semibold">{gameAnalytics?.unique_players || 0}</span>
+              <span className="font-semibold">{gameAnalytics?.uniquePlayers || 0}</span>
             </div>
             <div className="flex justify-between">
               <span>Avg Duration:</span>
               <span className="font-semibold">
-                {gameAnalytics?.average_game_duration ? `${Math.round(gameAnalytics.average_game_duration)}min` : 'N/A'}
+                {gameAnalytics?.averageGameDuration ? `${Math.round(gameAnalytics.averageGameDuration)}min` : 'N/A'}
               </span>
             </div>
           </div>

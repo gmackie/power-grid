@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import { CreateSimulatedGameRequest, SimulatedGame } from '../../types/admin';
+import type { CreateSimulatedGameRequest, SimulatedGame, AIPlayer } from '../../types/admin';
 import { simulatedGamesApi } from '../../services/simulatedGamesApi';
 import { Brain, Zap, Shield, Shuffle } from 'lucide-react';
 
@@ -118,8 +118,8 @@ export const CreateSimulatedGame: React.FC<CreateSimulatedGameProps> = ({
         aiPlayers: aiClients.map((client, i) => ({
           id: client.id,
           name: client.name,
-          personality: formData.aiConfigurations?.[i]?.personality || 'balanced',
-          strategy: formData.aiConfigurations?.[i]?.strategy || 'balanced',
+          personality: (formData.aiConfigurations?.[i]?.personality || 'balanced') as AIPlayer['personality'],
+          strategy: (formData.aiConfigurations?.[i]?.strategy || 'balanced') as AIPlayer['strategy'],
           currentMoney: 50,
           citiesOwned: 0,
           powerPlants: [],

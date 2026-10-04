@@ -18,7 +18,7 @@ const BureaucracyPhase: React.FC<BureaucracyPhaseProps> = ({ bureaucracyState, l
     playerId
   } = useGameStore();
   
-  const { powerCities } = useGameActions(localMode);
+  const { powerCities, endTurn } = useGameActions(localMode);
   
   const [plantsToPower, setPlantsToPower] = useState<Set<number>>(new Set());
   const [resourcesUsed, setResourcesUsed] = useState<Record<ResourceType, number>>({
@@ -150,7 +150,7 @@ const BureaucracyPhase: React.FC<BureaucracyPhaseProps> = ({ bureaucracyState, l
   
   const handlePowerCities = () => {
     const { citiesPowered } = calculateEarnings();
-    powerCities(citiesPowered);
+    powerCities(citiesPowered, Array.from(plantsToPower));
   };
   
   const { citiesPowered, earnings } = calculateEarnings();
@@ -288,6 +288,13 @@ const BureaucracyPhase: React.FC<BureaucracyPhaseProps> = ({ bureaucracyState, l
               >
                 <DollarSign className="w-5 h-5 mr-2" />
                 Power {citiesPowered} Cities & Earn ${earnings}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full touch-target mt-3"
+                onClick={endTurn}
+              >
+                End Turn
               </Button>
             </Card>
           )}

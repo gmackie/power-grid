@@ -9,6 +9,7 @@ const LobbyScreen: React.FC = () => {
   const { 
     currentLobby,
     playerName,
+    playerId,
     connectionStatus,
     setCurrentScreen,
     leaveLobby,
@@ -33,7 +34,7 @@ const LobbyScreen: React.FC = () => {
     );
   }
 
-  const currentPlayer = currentLobby.players.find(p => p.name === playerName);
+  const currentPlayer = currentLobby.players.find(p => (playerId ? p.id === playerId : p.name === playerName));
   const isHost = currentPlayer?.is_host || false;
 
   const handleCopyGameId = async () => {
@@ -137,7 +138,7 @@ const LobbyScreen: React.FC = () => {
                   />
                   <span className="text-white font-medium flex items-center gap-2">
                     {player.name}
-                    {player.name === playerName && ' (You)'}
+                    {(playerId ? player.id === playerId : player.name === playerName) && ' (You)'}
                     {player.is_host && <Crown className="w-4 h-4 text-yellow-400" />}
                   </span>
                 </div>

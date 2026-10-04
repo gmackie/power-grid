@@ -7,6 +7,8 @@ import AuctionPhase from './phases/AuctionPhase';
 import ResourcePhase from './phases/ResourcePhase';
 import BuildingPhase from './phases/BuildingPhase';
 import BureaucracyPhase from './phases/BureaucracyPhase';
+import { gameSocket } from '../services/gameSocket';
+import type { GameState, City } from '../types/game';
 
 const GameScreen: React.FC = () => {
   const { 
@@ -14,7 +16,8 @@ const GameScreen: React.FC = () => {
     getCurrentPlayer,
     isCurrentPlayerTurn,
     setCurrentScreen,
-    connectionStatus 
+    connectionStatus,
+    startGame
   } = useGameStore();
   
   const [localMode, setLocalMode] = React.useState(false);
@@ -24,11 +27,20 @@ const GameScreen: React.FC = () => {
   const currentPlayer = getCurrentPlayer();
   const isMyTurn = isCurrentPlayerTurn();
 
+  // Mock cities for development
+  const mockCitiesData: City[] = [
+    { id: 'berlin', name: 'Berlin', region: 'yellow', connections: [], x: 0.5, y: 0.3, houses: [] },
+    { id: 'hamburg', name: 'Hamburg', region: 'yellow', connections: [], x: 0.4, y: 0.2, houses: [] },
+    { id: 'munich', name: 'Munich', region: 'yellow', connections: [], x: 0.6, y: 0.7, houses: [] }
+  ];
+
   // Use real game state or fallback to mock for development
-  const currentGameState = gameState || {
+  const currentGameState: GameState = gameState || {
+    id: 'mock-game',
     currentRound: 1,
     phase: 'auction' as const,
     currentPlayer: 0,
+    turnOrder: ['1', '2'],
     players: [
       {
         id: '1',
@@ -55,10 +67,26 @@ const GameScreen: React.FC = () => {
       { id: 2, number: 4, cost: 15, resourceType: 'coal' as const, resourceCount: 2, citiesPowered: 1 },
       { id: 3, number: 5, cost: 20, resourceType: 'hybrid' as const, resourceCount: 2, citiesPowered: 1 },
       { id: 4, number: 6, cost: 25, resourceType: 'garbage' as const, resourceCount: 1, citiesPowered: 1 }
-    ]
+    ],
+    resourceMarket: {
+      coal: 24,
+      oil: 18,
+      garbage: 6,
+      uranium: 2,
+      hybrid: 0,
+      eco: 0,
+      coalPrice: 1,
+      oilPrice: 2,
+      garbagePrice: 3,
+      uraniumPrice: 8,
+      hybridPrice: 0,
+      ecoPrice: 0
+    },
+    cities: mockCitiesData
   };
 
   const handleLeaveGame = () => {
+    gameSocket.disconnect();
     setCurrentScreen('menu');
   };
 
@@ -139,7 +167,7 @@ const GameScreen: React.FC = () => {
               Unknown Phase
             </h3>
             <p className="text-slate-400">
-              Invalid game phase: {currentGameState.phase}
+              Invalid game phase: {(currentGameState as any).phase}
             </p>
           </Card>
         );
@@ -230,6 +258,8 @@ const GameScreen: React.FC = () => {
             </h1>
             <p className="text-sm text-slate-400">
               Round {currentGameState.currentRound} • {currentGameState.phase} Phase
+              {currentGameState.step !== undefined && ` • Step ${currentGameState.step}`}
+              {currentGameState.status && ` • ${currentGameState.status}`}
             </p>
             {/* Development mode toggle */}
             {process.env.NODE_ENV === 'development' && (
@@ -265,6 +295,30 @@ const GameScreen: React.FC = () => {
         max-w-7xl mx-auto p-4 space-y-6
         ${isMobile && orientation === 'portrait' ? 'space-y-4' : ''}
       `}>
+        {/* Lobby: start game */}
+        {gameState?.status === 'LOBBY' && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-slate-300">
+                Waiting to start ({gameState.players.length} players connected)
+              </p>
+              <Button onClick={startGame} className="touch-target">
+                Start game
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Winner banner */}
+        {gameState?.status === 'FINISHED' && (
+          <Card className="p-4 bg-yellow-600 border-yellow-500">
+            <p className="text-center text-white font-bold text-lg">
+              Game over!{' '}
+              {gameState.players.find(p => p.id === gameState.winnerId)?.name ?? 'Unknown'} wins!
+            </p>
+          </Card>
+        )}
+
         {/* Turn Indicator */}
         {isMyTurn && (
           <Card className="p-4 bg-green-600 border-green-500">
@@ -358,7 +412,7 @@ const GameScreen: React.FC = () => {
                     </div>
                     
                     <div className="text-slate-400">
-                      Resources: {Object.values(player.resources).reduce((a, b) => a + b, 0)}
+                      Resources: {Object.values(player.resources).reduce((a: number, b: number) => a + b, 0)}
                     </div>
                   </div>
                 </div>

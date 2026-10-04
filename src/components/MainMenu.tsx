@@ -4,6 +4,7 @@ import { Play, Users, Settings, Wifi, WifiOff, Smartphone, Monitor, Shield } fro
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Card from './ui/Card';
+import { Logo } from './ui/Art';
 
 const MainMenu: React.FC = () => {
   const { 
@@ -64,9 +65,8 @@ const MainMenu: React.FC = () => {
       <div className="w-full max-w-md mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-white">
-            Power Grid
-          </h1>
+          <h1 className="sr-only">Power Grid</h1>
+          <Logo className="mx-auto w-full max-w-sm h-auto" width={undefined} height={undefined} />
           <p className="text-slate-400 text-lg">
             Digital Board Game
           </p>

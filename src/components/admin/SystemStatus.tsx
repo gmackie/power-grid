@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { adminApi } from '../../services/adminApi';
-import { HealthStatus, ServerInfo } from '@power-grid/api-client';
+import type { HealthStatus, ServerInfo } from '../../types/api-client';
 
 export const SystemStatus: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -70,20 +70,20 @@ export const SystemStatus: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Database</span>
-                  <span className={health.database ? 'text-green-600' : 'text-red-600'}>
-                    {health.database ? '✓ Connected' : '✗ Disconnected'}
+                  <span className={health.checks.database ? 'text-green-600' : 'text-red-600'}>
+                    {health.checks.database ? '✓ Connected' : '✗ Disconnected'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">WebSocket Server</span>
-                  <span className={health.websocket ? 'text-green-600' : 'text-red-600'}>
-                    {health.websocket ? '✓ Running' : '✗ Not Running'}
+                  <span className={health.checks.websocket ? 'text-green-600' : 'text-red-600'}>
+                    {health.checks.websocket ? '✓ Running' : '✗ Not Running'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Cache</span>
-                  <span className={health.cache ? 'text-green-600' : 'text-red-600'}>
-                    {health.cache ? '✓ Available' : '✗ Unavailable'}
+                  <span className={health.checks.cache ? 'text-green-600' : 'text-red-600'}>
+                    {health.checks.cache ? '✓ Available' : '✗ Unavailable'}
                   </span>
                 </div>
               </div>
@@ -154,7 +154,7 @@ export const SystemStatus: React.FC = () => {
               </div>
               <div>
                 <div className="text-sm text-gray-500">Start Time</div>
-                <div className="font-medium">{new Date(serverInfo.start_time).toLocaleString()}</div>
+                <div className="font-medium">{new Date(serverInfo.startTime).toLocaleString()}</div>
               </div>
               <div>
                 <div className="text-sm text-gray-500">Environment</div>

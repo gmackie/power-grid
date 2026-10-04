@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ArrowLeft, Users, Map, Lock, Play } from 'lucide-react';
 import Button from './ui/Button';
@@ -20,16 +20,24 @@ const CreateLobby: React.FC = () => {
   const [usePassword, setUsePassword] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const availableMaps = [
-    { id: 'usa', name: 'USA', description: 'The original Power Grid map' },
-    { id: 'germany', name: 'Germany', description: 'European variant with different regions' },
-    { id: 'china', name: 'China', description: 'Asian expansion with unique mechanics' }
-  ];
+  const [availableMaps, setAvailableMaps] = useState<Array<{id:string; name:string; description:string}>>([]);
+  const [mapError, setMapError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/maps', {signal: controller.signal})
+      .then(response => {
+        if (!response.ok) throw new Error('Unable to load maps');
+        return response.json();
+      })
+      .then(data => setAvailableMaps(data.maps))
+      .catch(error => { if (error.name !== 'AbortError') setMapError('Unable to load maps. Please try again.'); });
+    return () => controller.abort();
+  }, []);
 
   const playerCounts = [2, 3, 4, 5, 6];
 
   const handleCreateLobby = async () => {
-    if (!lobbyName.trim() || creating) return;
+    if (!lobbyName.trim() || creating || !availableMaps.some(map => map.id === selectedMap)) return;
     
     setCreating(true);
     
@@ -120,6 +128,7 @@ const CreateLobby: React.FC = () => {
               Game Map
             </label>
             <div className="space-y-2">
+              {mapError && <p role="alert" className="text-red-400">{mapError}</p>}
               {availableMaps.map((map) => (
                 <button
                   key={map.id}

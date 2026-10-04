@@ -6,7 +6,8 @@ export interface GameActions {
   pass: () => void;
   buyResources: (resources: Record<ResourceType, number>) => void;
   buildCity: (cityId: string) => void;
-  powerCities: (citiesPowered: number) => void;
+  powerCities: (citiesPowered: number, plantIds: number[]) => void;
+  endTurn: () => void;
 }
 
 /**
@@ -23,7 +24,8 @@ export function useGameActions(localMode: boolean = false): GameActions {
       pass: store.simulatePass,
       buyResources: store.simulateBuyResources,
       buildCity: store.simulateBuildCity,
-      powerCities: store.simulatePowerCities
+      powerCities: (citiesPowered) => store.simulatePowerCities(citiesPowered),
+      endTurn: store.simulatePass
     };
   } else {
     // Use server synchronization methods
@@ -32,7 +34,8 @@ export function useGameActions(localMode: boolean = false): GameActions {
       pass: store.pass,
       buyResources: store.buyResources,
       buildCity: store.buildCity,
-      powerCities: store.powerCities
+      powerCities: (_citiesPowered, plantIds) => store.powerCities(plantIds),
+      endTurn: store.endTurn
     };
   }
 }

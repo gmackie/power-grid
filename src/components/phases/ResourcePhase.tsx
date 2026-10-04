@@ -5,6 +5,7 @@ import { Fuel, Minus, Plus, ShoppingCart, Check } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import useGameActions from '../../hooks/useGameActions';
+import { ResourceIcon } from '../ui/Art';
 
 interface ResourcePhaseProps {
   resourcePhaseState: ResourcePhaseState;
@@ -19,7 +20,7 @@ const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resou
     playerId
   } = useGameStore();
   
-  const { buyResources, pass } = useGameActions(localMode);
+  const { buyResources, endTurn } = useGameActions(localMode);
   
   const { isMobile } = useDeviceStore();
   
@@ -107,7 +108,7 @@ const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resou
   };
   
   const handlePass = () => {
-    pass();
+    endTurn();
     setResourcesToBuy({ coal: 0, oil: 0, garbage: 0, uranium: 0, hybrid: 0, eco: 0 });
   };
   
@@ -124,8 +125,8 @@ const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resou
       <div key={type} className="p-4 bg-game-surface rounded-lg">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 ${color} rounded-full flex items-center justify-center text-white`}>
-              {icon}
+            <div className={`w-10 h-10 ${color} rounded-full flex items-center justify-center text-white`} title={icon}>
+              <ResourceIcon type={type} size={28} />
             </div>
             <div>
               <h4 className="text-white font-medium capitalize">{type}</h4>
@@ -278,7 +279,7 @@ const ResourcePhase: React.FC<ResourcePhaseProps> = ({ resourcePhaseState, resou
               className="touch-target"
               onClick={handlePass}
             >
-              Pass
+              End Turn
             </Button>
           </div>
         </Card>

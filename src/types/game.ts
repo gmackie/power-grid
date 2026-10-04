@@ -103,6 +103,14 @@ export interface GameState {
   resourcePhaseState?: ResourcePhaseState;
   buildingPhaseState?: BuildingPhaseState;
   bureaucracyState?: BureaucracyState;
+  // Extra fields populated from the server (optional so local mode keeps working)
+  status?: 'LOBBY' | 'PLAYING' | 'FINISHED';
+  step?: number;
+  currentTurn?: string;
+  futureMarket?: PowerPlant[];
+  winnerId?: string | null;
+  activeRegions?: string[];
+  serverPhase?: string;
 }
 
 export interface AuctionState {
@@ -137,7 +145,10 @@ export interface BureaucracyState {
 export interface WebSocketMessage {
   type: string;
   session_id?: string;
+  timestamp?: number | string;
   data?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload?: any;
   error?: string;
 }
 

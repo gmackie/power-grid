@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { adminApi } from '../../services/adminApi';
-import { GameAnalytics } from '@power-grid/api-client';
+import type { GameAnalytics } from '../../types/api-client';
 
 export const GameAnalyticsView: React.FC = () => {
   const [analytics, setAnalytics] = useState<GameAnalytics | null>(null);
@@ -126,7 +126,7 @@ export const GameAnalyticsView: React.FC = () => {
               <div className="p-6">
                 <h3 className="text-sm font-medium text-gray-500">Total Games Played</h3>
                 <p className="mt-2 text-3xl font-semibold text-gray-900">
-                  {analytics.total_games || 0}
+                  {analytics.totalGames || 0}
                 </p>
               </div>
             </Card>
@@ -135,7 +135,7 @@ export const GameAnalyticsView: React.FC = () => {
               <div className="p-6">
                 <h3 className="text-sm font-medium text-gray-500">Active Players</h3>
                 <p className="mt-2 text-3xl font-semibold text-gray-900">
-                  {analytics.unique_players || 0}
+                  {analytics.uniquePlayers || 0}
                 </p>
               </div>
             </Card>
@@ -144,7 +144,7 @@ export const GameAnalyticsView: React.FC = () => {
               <div className="p-6">
                 <h3 className="text-sm font-medium text-gray-500">Average Game Duration</h3>
                 <p className="mt-2 text-3xl font-semibold text-gray-900">
-                  {analytics.average_game_duration ? `${Math.round(analytics.average_game_duration)}min` : 'N/A'}
+                  {analytics.averageGameDuration ? `${Math.round(analytics.averageGameDuration)}min` : 'N/A'}
                 </p>
               </div>
             </Card>
@@ -153,7 +153,7 @@ export const GameAnalyticsView: React.FC = () => {
               <div className="p-6">
                 <h3 className="text-sm font-medium text-gray-500">Games In Progress</h3>
                 <p className="mt-2 text-3xl font-semibold text-gray-900">
-                  {analytics.games_in_progress || 0}
+                  {analytics.gamesInProgress || 0}
                 </p>
               </div>
             </Card>
@@ -172,19 +172,19 @@ export const GameAnalyticsView: React.FC = () => {
               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
                   <div className="text-sm text-gray-500">Auction Phase</div>
-                  <div className="text-lg font-semibold">{analytics.phase_breakdown?.auction || 0}%</div>
+                  <div className="text-lg font-semibold">{analytics.phaseDistribution?.auction || 0}%</div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-gray-500">Resource Phase</div>
-                  <div className="text-lg font-semibold">{analytics.phase_breakdown?.resource || 0}%</div>
+                  <div className="text-lg font-semibold">{analytics.phaseDistribution?.resource || 0}%</div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-gray-500">Building Phase</div>
-                  <div className="text-lg font-semibold">{analytics.phase_breakdown?.building || 0}%</div>
+                  <div className="text-lg font-semibold">{analytics.phaseDistribution?.building || 0}%</div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-gray-500">Bureaucracy Phase</div>
-                  <div className="text-lg font-semibold">{analytics.phase_breakdown?.bureaucracy || 0}%</div>
+                  <div className="text-lg font-semibold">{analytics.phaseDistribution?.bureaucracy || 0}%</div>
                 </div>
               </div>
             </div>
@@ -213,19 +213,19 @@ export const GameAnalyticsView: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <div className="text-sm text-gray-500">New Players</div>
-                    <div className="text-2xl font-semibold">{analytics.new_players || 0}</div>
+                    <div className="text-2xl font-semibold">{analytics.uniquePlayers || 0}</div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-500">Returning Players</div>
-                    <div className="text-2xl font-semibold">{analytics.returning_players || 0}</div>
+                    <div className="text-2xl font-semibold">{analytics.uniquePlayers || 0}</div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-500">Average Games per Player</div>
-                    <div className="text-2xl font-semibold">{analytics.avg_games_per_player?.toFixed(1) || 0}</div>
+                    <div className="text-2xl font-semibold">{((analytics.totalGames || 0) / (analytics.uniquePlayers || 1)).toFixed(1)}</div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-500">Player Retention Rate</div>
-                    <div className="text-2xl font-semibold">{analytics.retention_rate ? `${(analytics.retention_rate * 100).toFixed(1)}%` : 'N/A'}</div>
+                    <div className="text-2xl font-semibold">N/A</div>
                   </div>
                 </div>
                 

@@ -2,161 +2,14 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { GameState, Player, AppState, LobbyState, Lobby, LobbyListItem, PowerPlant, City, ResourceMarket, ResourceType } from '../types/game';
-import { wsManager, gameActions, lobbyActions } from '../services/websocket';
+import type { GameState, Player, AppState, LobbyState, Lobby, LobbyListItem, ResourceType } from '../types/game';
+import { wsManager, lobbyActions } from '../services/websocket';
+import { gameSocket } from '../services/gameSocket';
+import { adaptGameState } from '../utils/gameStateAdapter';
+import type { ServerGameState } from '../utils/gameStateAdapter';
 import type { ConnectionStatus } from '../services/websocket';
 import { PhaseManager } from '../utils/phaseManager';
 import { TurnManager } from '../utils/turnManager';
-
-// Helper function to create initial game state from lobby data
-function createInitialGameState(serverLobby: any, currentPlayerId?: string): GameState {
-  console.log('Creating initial game state from lobby:', serverLobby);
-  
-  // Convert lobby players to game players
-  const players: Player[] = [];
-  if (serverLobby.players && typeof serverLobby.players === 'object') {
-    Object.entries(serverLobby.players).forEach(([id, player]: [string, any]) => {
-      players.push({
-        id: id,
-        name: player.name,
-        color: player.color || '#ff0000',
-        money: 50, // Starting money
-        powerPlants: [],
-        cities: [],
-        resources: {
-          coal: 0,
-          oil: 0,
-          garbage: 0,
-          uranium: 0,
-          hybrid: 0,
-          eco: 0
-        }
-      });
-    });
-  }
-  
-  // Create initial power plant market
-  const powerPlantMarket: PowerPlant[] = [
-    { id: 1, number: 3, cost: 7, resourceType: 'oil', resourceCount: 2, citiesPowered: 1 },
-    { id: 2, number: 4, cost: 9, resourceType: 'coal', resourceCount: 2, citiesPowered: 1 },
-    { id: 3, number: 5, cost: 10, resourceType: 'hybrid', resourceCount: 2, citiesPowered: 1 },
-    { id: 4, number: 6, cost: 11, resourceType: 'garbage', resourceCount: 1, citiesPowered: 1 },
-    { id: 5, number: 7, cost: 13, resourceType: 'oil', resourceCount: 3, citiesPowered: 2 },
-    { id: 6, number: 8, cost: 15, resourceType: 'coal', resourceCount: 3, citiesPowered: 2 },
-    { id: 7, number: 9, cost: 16, resourceType: 'oil', resourceCount: 1, citiesPowered: 1 },
-    { id: 8, number: 10, cost: 12, resourceType: 'coal', resourceCount: 2, citiesPowered: 2 }
-  ];
-  
-  // Create initial resource market
-  const resourceMarket: ResourceMarket = {
-    coal: 24,
-    oil: 18,
-    garbage: 6,
-    uranium: 2,
-    hybrid: 0,
-    eco: 0,
-    coalPrice: 1,
-    oilPrice: 3,
-    garbagePrice: 7,
-    uraniumPrice: 14,
-    hybridPrice: 0,
-    ecoPrice: 0
-  };
-  
-  // Create mock cities for the selected map
-  const cities: City[] = createCitiesForMap(serverLobby.map_id);
-  
-  // Create turn order (can be randomized later)
-  const turnOrder = players.map(p => p.id);
-  
-  return {
-    id: serverLobby.game_id || serverLobby.id,
-    players,
-    currentPlayer: 0,
-    currentRound: 1,
-    phase: 'auction',
-    powerPlantMarket,
-    resourceMarket,
-    cities,
-    turnOrder,
-    auctionState: {
-      currentPlant: undefined,
-      currentBid: 0,
-      currentBidder: undefined,
-      biddingOrder: turnOrder,
-      passedPlayers: [],
-      plantsWon: {}
-    }
-  };
-}
-
-// Helper function to create cities for a map
-function createCitiesForMap(mapId: string): City[] {
-  // For now, create a generic set of cities
-  // In a real implementation, this would load actual map data
-  return [
-    {
-      id: 'berlin',
-      name: 'Berlin',
-      x: 0.5,
-      y: 0.3,
-      region: 'North',
-      houses: [],
-      connections: [
-        { to: 'hamburg', cost: 10 },
-        { to: 'munich', cost: 15 }
-      ]
-    },
-    {
-      id: 'hamburg',
-      name: 'Hamburg',
-      x: 0.4,
-      y: 0.2,
-      region: 'North',
-      houses: [],
-      connections: [
-        { to: 'berlin', cost: 10 },
-        { to: 'cologne', cost: 12 }
-      ]
-    },
-    {
-      id: 'munich',
-      name: 'Munich',
-      x: 0.6,
-      y: 0.5,
-      region: 'South',
-      houses: [],
-      connections: [
-        { to: 'berlin', cost: 15 },
-        { to: 'frankfurt', cost: 8 }
-      ]
-    },
-    {
-      id: 'cologne',
-      name: 'Cologne',
-      x: 0.3,
-      y: 0.4,
-      region: 'West',
-      houses: [],
-      connections: [
-        { to: 'hamburg', cost: 12 },
-        { to: 'frankfurt', cost: 6 }
-      ]
-    },
-    {
-      id: 'frankfurt',
-      name: 'Frankfurt',
-      x: 0.5,
-      y: 0.4,
-      region: 'Central',
-      houses: [],
-      connections: [
-        { to: 'munich', cost: 8 },
-        { to: 'cologne', cost: 6 }
-      ]
-    }
-  ];
-}
 
 interface GameStore extends AppState {
   // Connection state
@@ -186,7 +39,8 @@ interface GameStore extends AppState {
   pass: () => void;
   buyResources: (resources: Record<ResourceType, number>) => void;
   buildCity: (cityId: string) => void;
-  powerCities: (citiesPowered: number) => void;
+  powerCities: (plantIds: number[]) => void;
+  endTurn: () => void;
   
   // Local simulation methods
   simulateBid: (amount: number, plantId?: number) => void;
@@ -252,6 +106,7 @@ export const useGameStore = create<GameStore>()(
     },
 
     disconnect: () => {
+      gameSocket.disconnect();
       wsManager.disconnect();
       set({ 
         connectionStatus: 'disconnected',
@@ -315,72 +170,69 @@ export const useGameStore = create<GameStore>()(
       }, 100);
     },
 
-    joinGame: (gameId: string, playerName: string, playerColor: string) => {
-      if (gameActions.joinGame(gameId, playerName, playerColor)) {
-        set({ 
-          playerName,
-          currentScreen: 'lobby'
-        });
-      }
+    joinGame: (_gameId: string, playerName: string) => {
+      // Legacy: games are joined through lobbies now.
+      get().registerPlayer(playerName);
     },
 
     startGame: () => {
-      gameActions.startGame();
+      if (!gameSocket.startGame()) {
+        set({ errorMessage: 'Not connected to game' });
+      }
     },
 
-    // Player actions - Send to server for synchronization
+    // Player actions - sent over the game socket
     bid: (amount: number, plantId?: number) => {
       const state = get();
-      if (state.canPerformAction()) {
-        // Send bid action to server
-        const success = gameActions.bid(amount, plantId);
-        if (!success) {
-          set({ errorMessage: 'Failed to send bid to server' });
-        }
+      if (!state.canPerformAction()) return;
+      const id = plantId ?? state.gameState?.auctionState?.currentPlant?.id;
+      if (id === undefined) {
+        set({ errorMessage: 'No power plant selected' });
+        return;
+      }
+      if (!gameSocket.bidPlant(id, amount)) {
+        set({ errorMessage: 'Failed to send bid to server' });
       }
     },
 
     pass: () => {
       const state = get();
-      if (state.canPerformAction()) {
-        // Send pass action to server
-        const success = gameActions.pass();
-        if (!success) {
-          set({ errorMessage: 'Failed to send pass to server' });
-        }
-      }
+      if (!state.canPerformAction()) return;
+      const auctionPlant = state.gameState?.auctionState?.currentPlant;
+      const ok = auctionPlant
+        ? gameSocket.bidPlant(auctionPlant.id, 0)
+        : gameSocket.endTurn();
+      if (!ok) set({ errorMessage: 'Failed to send pass to server' });
+    },
+
+    endTurn: () => {
+      if (!get().canPerformAction()) return;
+      if (!gameSocket.endTurn()) set({ errorMessage: 'Failed to end turn' });
     },
 
     buyResources: (resources: Record<ResourceType, number>) => {
-      const state = get();
-      if (state.canPerformAction()) {
-        // Send buy resources action to server
-        const success = gameActions.buyResources(resources);
-        if (!success) {
-          set({ errorMessage: 'Failed to send buy resources to server' });
-        }
+      if (!get().canPerformAction()) return;
+      const out: Record<string, number> = {};
+      if (resources.coal) out.Coal = resources.coal;
+      if (resources.oil) out.Oil = resources.oil;
+      if (resources.garbage) out.Garbage = resources.garbage;
+      if (resources.uranium) out.Uranium = resources.uranium;
+      if (!gameSocket.buyResources(out)) {
+        set({ errorMessage: 'Failed to send buy resources to server' });
       }
     },
 
     buildCity: (cityId: string) => {
-      const state = get();
-      if (state.canPerformAction()) {
-        // Send build city action to server
-        const success = gameActions.buildCity(cityId);
-        if (!success) {
-          set({ errorMessage: 'Failed to send build city to server' });
-        }
+      if (!get().canPerformAction()) return;
+      if (!gameSocket.buildCity(cityId)) {
+        set({ errorMessage: 'Failed to send build city to server' });
       }
     },
 
-    powerCities: (citiesPowered: number) => {
-      const state = get();
-      if (state.canPerformAction()) {
-        // Send power cities action to server
-        const success = gameActions.powerCities(citiesPowered);
-        if (!success) {
-          set({ errorMessage: 'Failed to send power cities to server' });
-        }
+    powerCities: (plantIds: number[]) => {
+      if (!get().canPerformAction()) return;
+      if (!gameSocket.powerCities(plantIds)) {
+        set({ errorMessage: 'Failed to send power cities to server' });
       }
     },
 
@@ -532,10 +384,7 @@ export const useGameStore = create<GameStore>()(
     isCurrentPlayerTurn: () => {
       const { gameState, playerId } = get();
       if (!gameState || !playerId) return false;
-      
-      const turnOrder = PhaseManager.getTurnOrder(gameState, gameState.phase);
-      const currentPlayerId = turnOrder[gameState.currentPlayer];
-      return currentPlayerId === playerId;
+      return gameState.currentTurn === playerId;
     },
 
     canPerformAction: () => {
@@ -596,7 +445,11 @@ wsManager.setOnMessage((message) => {
     // Connection messages
     case 'CONNECTED':
       console.log('Player registered successfully:', message.data);
-      useGameStore.setState({ isPlayerRegistered: true });
+      useGameStore.setState({
+        isPlayerRegistered: true,
+        ...(message.data?.player_id ? { playerId: message.data.player_id as string } : {}),
+        ...(message.data?.player_name ? { playerName: message.data.player_name as string } : {})
+      });
       break;
       
     // Lobby messages
@@ -818,22 +671,17 @@ wsManager.setOnMessage((message) => {
           store.setCurrentLobby(updatedLobby);
         }
         
-        // Initialize game state from lobby data
-        const gameState = createInitialGameState(serverLobby, store.playerId);
-        store.setGameState(gameState);
-        
-        // Set player ID from lobby if not set
-        if (!store.playerId && serverLobby.players && store.playerName) {
-          const playerEntry = Object.entries(serverLobby.players).find(([id, player]: [string, any]) => 
-            player.name === store.playerName
-          );
-          if (playerEntry) {
-            store.setPlayerInfo(playerEntry[0], store.playerName);
-          }
+      }
+      if (message.data?.game_id) {
+        const { playerId, playerName } = useGameStore.getState();
+        if (playerId) {
+          gameSocket
+            .connect(playerId, playerName || 'Player', message.data.game_id as string)
+            .catch(() => store.setError('Failed to connect to game'));
+          store.setCurrentScreen('game');
+        } else {
+          store.setError('Cannot join game: player id unknown');
         }
-        
-        // Navigate to game screen
-        store.setCurrentScreen('game');
       }
       break;
       
@@ -847,8 +695,32 @@ wsManager.setOnMessage((message) => {
       console.log('Game ended:', message.data);
       break;
       
+    case 'ERROR':
+      store.setError((message.data as { message?: string } | undefined)?.message || message.error || 'Server error');
+      break;
+
     default:
       console.log('Unhandled message:', message.type, message.data);
+  }
+});
+
+// Game socket handlers
+gameSocket.setHandlers({
+  onError: (error) => useGameStore.getState().setError(error),
+  onMessage: (message) => {
+    const store = useGameStore.getState();
+    switch (message.type) {
+      case 'GAME_STATE':
+        if (message.data) {
+          store.setGameState(adaptGameState(message.data as ServerGameState));
+        }
+        break;
+      case 'ERROR':
+        store.setError(message.data?.message || message.error || 'Server error');
+        break;
+      default:
+        break;
+    }
   }
 });
 

@@ -9,6 +9,8 @@ export interface WebSocketConfig {
   reconnectAttempts?: number;
   reconnectDelay?: number;
   heartbeatInterval?: number;
+  /** Persist the server session id in sessionStorage (default true). */
+  persistSession?: boolean;
 }
 
 export class WebSocketManager {
@@ -26,12 +28,14 @@ export class WebSocketManager {
   private onGameState: ((state: GameState) => void) | null = null;
   private onError: ((error: string) => void) | null = null;
   private onMessage: ((message: WebSocketMessage) => void) | null = null;
+  private onOpen: (() => void) | null = null;
 
   constructor(config: WebSocketConfig) {
     this.config = {
       reconnectAttempts: 5,
       reconnectDelay: 2000,
       heartbeatInterval: 30000,
+      persistSession: true,
       ...config
     };
     
@@ -56,6 +60,7 @@ export class WebSocketManager {
           this.setConnectionStatus('connected');
           this.reconnectAttempts = 0;
           this.startHeartbeat();
+          this.onOpen?.();
           resolve();
         };
 
@@ -151,6 +156,10 @@ export class WebSocketManager {
 
   setOnError(handler: (error: string) => void): void {
     this.onError = handler;
+  }
+
+  setOnOpen(handler: () => void): void {
+    this.onOpen = handler;
   }
 
   setOnMessage(handler: (message: WebSocketMessage) => void): void {
@@ -252,6 +261,7 @@ export class WebSocketManager {
 
   // Session persistence methods
   private storeSessionId(sessionId: string): void {
+    if (!this.config.persistSession) return;
     try {
       sessionStorage.setItem(this.SESSION_STORAGE_KEY, sessionId);
       console.log('Session ID stored in sessionStorage:', sessionId);
@@ -261,6 +271,7 @@ export class WebSocketManager {
   }
 
   private restoreSessionId(): void {
+    if (!this.config.persistSession) return;
     try {
       const storedSessionId = sessionStorage.getItem(this.SESSION_STORAGE_KEY);
       if (storedSessionId) {
@@ -273,6 +284,7 @@ export class WebSocketManager {
   }
 
   private clearStoredSessionId(): void {
+    if (!this.config.persistSession) return;
     try {
       sessionStorage.removeItem(this.SESSION_STORAGE_KEY);
       console.log('Session ID cleared from sessionStorage');
@@ -288,9 +300,19 @@ export class WebSocketManager {
 }
 
 // Default WebSocket manager instance
-const getWebSocketUrl = (): string => {
-  // Check for environment variable first, fallback to default port
-  const port = import.meta.env.VITE_WS_PORT || '5080';
+export const getWebSocketUrl = (): string => {
+  // Use environment variable for WebSocket URL
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+  
+  // In production, use wss://ws.power-grid.gmac.io
+  if (import.meta.env.PROD) {
+    return 'wss://ws.power-grid.gmac.io';
+  }
+  
+  // In development, use local WebSocket server
+  const port = import.meta.env.VITE_WS_PORT || '8787';
   return `ws://localhost:${port}/ws`;
 };
 
@@ -300,64 +322,6 @@ export const wsManager = new WebSocketManager({
   reconnectDelay: 1000,
   heartbeatInterval: 0
 });
-
-// Game-specific helper functions
-export const gameActions = {
-  joinGame: (gameId: string, playerName: string, playerColor: string) => {
-    return wsManager.send({
-      type: 'join_game',
-      data: { gameId, playerName, playerColor }
-    });
-  },
-
-  createGame: (playerName: string, playerColor: string) => {
-    return wsManager.send({
-      type: 'create_game',
-      data: { playerName, playerColor }
-    });
-  },
-
-  startGame: () => {
-    return wsManager.send({
-      type: 'start_game'
-    });
-  },
-
-  bid: (amount: number, plantId?: number) => {
-    return wsManager.send({
-      type: 'player_action',
-      data: { action: 'bid', params: { amount, plant_id: plantId } }
-    });
-  },
-
-  pass: () => {
-    return wsManager.send({
-      type: 'player_action',
-      data: { action: 'pass', params: {} }
-    });
-  },
-
-  buyResources: (resources: Record<string, number>) => {
-    return wsManager.send({
-      type: 'player_action',
-      data: { action: 'buy_resources', params: { resources } }
-    });
-  },
-
-  buildCity: (cityId: string) => {
-    return wsManager.send({
-      type: 'player_action',
-      data: { action: 'build_city', params: { cityId } }
-    });
-  },
-
-  powerCities: (citiesPowered: number) => {
-    return wsManager.send({
-      type: 'player_action',
-      data: { action: 'power_cities', params: { citiesPowered } }
-    });
-  }
-};
 
 // Lobby-specific helper functions
 export const lobbyActions = {

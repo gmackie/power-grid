@@ -1,7 +1,7 @@
 // Service Worker for Power Grid Digital PWA
 
-const CACHE_NAME = 'power-grid-v1.0.0';
-const API_CACHE_NAME = 'power-grid-api-v1.0.0';
+const CACHE_NAME = 'power-grid-v2.0.0';
+const API_CACHE_NAME = 'power-grid-api-v2.0.0';
 
 // Files to cache for offline functionality
 const STATIC_CACHE_URLS = [
@@ -66,12 +66,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Handle API requests with network-first strategy
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirstStrategy(request, API_CACHE_NAME));
+  // Never cache live game data, authenticated responses, or mutations.
+  if (request.method !== 'GET' || /^\/(api|admin|maps|health|ready|docs|openapi\.json|ws|game)(\/|$)/.test(url.pathname)) return;
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirstStrategy(request, CACHE_NAME));
     return;
   }
-  
+
   // Handle static assets with cache-first strategy
   event.respondWith(cacheFirstStrategy(request, CACHE_NAME));
 });

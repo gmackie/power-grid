@@ -21,7 +21,7 @@ const BuildingPhase: React.FC<BuildingPhaseProps> = ({ buildingPhaseState, citie
     gameState
   } = useGameStore();
   
-  const { buildCity, pass } = useGameActions(localMode);
+  const { buildCity, endTurn } = useGameActions(localMode);
   
   const { isMobile } = useDeviceStore();
   
@@ -30,7 +30,10 @@ const BuildingPhase: React.FC<BuildingPhaseProps> = ({ buildingPhaseState, citie
   
   const currentPlayer = getCurrentPlayer();
   const isMyTurn = isCurrentPlayerTurn();
-  const myBuiltCities = buildingPhaseState.citiesBuilt[playerId || ''] || [];
+  const myBuiltCities = Array.from(new Set([
+    ...(buildingPhaseState.citiesBuilt[playerId || ''] || []),
+    ...(currentPlayer?.cities || [])
+  ]));
   
   // Calculate building cost for a city
   const calculateBuildingCost = (city: City): number => {
@@ -115,7 +118,7 @@ const BuildingPhase: React.FC<BuildingPhaseProps> = ({ buildingPhaseState, citie
   };
   
   const handlePass = () => {
-    pass();
+    endTurn();
     setSelectedCity(null);
   };
   
@@ -283,7 +286,7 @@ const BuildingPhase: React.FC<BuildingPhaseProps> = ({ buildingPhaseState, citie
               className="touch-target"
               onClick={handlePass}
             >
-              Done Building
+              End Turn
             </Button>
           </div>
           

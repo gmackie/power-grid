@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { SimulatedGame, AIPlayer, AIDecision } from '../../types/admin';
+import type { SimulatedGame, AIPlayer, AIDecision } from '../../types/admin';
 import { Play, Pause, Square, SkipForward, Eye, Brain, TrendingUp } from 'lucide-react';
 
 interface GameMonitorProps {
